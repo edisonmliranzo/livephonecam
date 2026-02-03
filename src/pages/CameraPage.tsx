@@ -1,7 +1,9 @@
-import { Mic, MicOff, Video, VideoOff, Activity, StopCircle, Wifi, Users } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, Activity, StopCircle, Wifi, Users, Copy, Check, ArrowLeft } from 'lucide-react';
 import { useRef, useState, useEffect } from 'react';
-import { db } from '../lib/firebase';
+import { useNavigate } from 'react-router-dom';
+import { db, auth } from '../lib/firebase';
 import { collection, doc, setDoc, onSnapshot, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 
 // WebRTC Configuration
 const servers = {
@@ -14,12 +16,15 @@ const servers = {
 };
 
 export default function CameraPage() {
+    const navigate = useNavigate();
     const videoRef = useRef<HTMLVideoElement>(null);
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [isAudioEnabled, setIsAudioEnabled] = useState(true);
     const [isVideoEnabled, setIsVideoEnabled] = useState(true);
     const [isMotionDetectionActive, setIsMotionDetectionActive] = useState(false);
     const [deviceId] = useState('CAM-' + Math.floor(1000 + Math.random() * 9000));
+    const [copied, setCopied] = useState(false);
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
 
     // WebRTC State
     const [pc, setPc] = useState<RTCPeerConnection | null>(null);
@@ -30,6 +35,13 @@ export default function CameraPage() {
     const [recordedChunks, setRecordedChunks] = useState<Blob[]>([]);
     const [isRecording, setIsRecording] = useState(false);
     const [lastMotionTime, setLastMotionTime] = useState<Date | null>(null);
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            setIsLoggedIn(!!user);
+        });
+        return () => unsubscribe();
+    }, []);
 
     useEffect(() => {
         if (recordedChunks.length > 0) {
@@ -61,8 +73,6 @@ export default function CameraPage() {
     const cleanupSignal = async () => {
         if (deviceId) {
             try {
-                // Ideally, we'd delete the subcollections too, but Firestore client generic delete doesn't handle recursive.
-                // For a prototype, just marking offline is okay or deleting the main doc.
                 await deleteDoc(doc(db, 'cameras', deviceId));
             } catch (e) {
                 console.error("Cleanup error", e);
@@ -91,7 +101,6 @@ export default function CameraPage() {
             if (videoRef.current) {
                 videoRef.current.srcObject = mediaStream;
             }
-            // Initialize WebRTC Signaling
             initializeSignaling(mediaStream);
         } catch (err) {
             console.error("Error accessing camera:", err);
@@ -103,24 +112,20 @@ export default function CameraPage() {
         setConnectionStatus('waiting');
         const peerConnection = new RTCPeerConnection(servers);
 
-        // Add local stream tracks to PeerConnection
         mediaStream.getTracks().forEach(track => {
             peerConnection.addTrack(track, mediaStream);
         });
 
-        // Setup Signaling in Firestore
         const callDoc = doc(db, 'cameras', deviceId);
         const offerCandidates = collection(callDoc, 'offerCandidates');
         const answerCandidates = collection(callDoc, 'answerCandidates');
 
-        // Handle ICE candidates
         peerConnection.onicecandidate = (event) => {
             if (event.candidate) {
                 addDoc(offerCandidates, event.candidate.toJSON());
             }
         };
 
-        // Create Offer
         const offerDescription = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offerDescription);
 
@@ -131,18 +136,16 @@ export default function CameraPage() {
 
         await setDoc(callDoc, { offer, online: true, updatedAt: serverTimestamp() });
 
-        // Listen for Answer
         onSnapshot(callDoc, (snapshot) => {
             const data = snapshot.data();
             if (!peerConnection.currentRemoteDescription && data?.answer) {
                 const answerDescription = new RTCSessionDescription(data.answer);
                 peerConnection.setRemoteDescription(answerDescription);
                 setConnectionStatus('connected');
-                setViewerCount(1); // Assumption for 1-1
+                setViewerCount(1);
             }
         });
 
-        // Listen for Remote ICE Candidates
         onSnapshot(answerCandidates, (snapshot) => {
             snapshot.docChanges().forEach((change) => {
                 if (change.type === 'added') {
@@ -152,7 +155,6 @@ export default function CameraPage() {
             });
         });
 
-        // Monitor connection state
         peerConnection.onconnectionstatechange = () => {
             if (peerConnection.connectionState === 'disconnected') {
                 setConnectionStatus('waiting');
@@ -212,95 +214,152 @@ export default function CameraPage() {
         }
     };
 
-    return (
-        <div className="h-screen bg-black relative flex flex-col overflow-hidden">
-            {/* Top Status Bar */}
-            <div className="absolute top-0 left-0 right-0 z-20 p-6 pt-12 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start pointer-events-none">
-                <div className="flex flex-col gap-3">
-                    <div className={`backdrop-blur-md px-4 py-2 rounded-full border border-white/10 flex items-center gap-2.5 transition-colors ${isRecording ? 'bg-red-500/20 border-red-500/50' : 'bg-black/40'
-                        }`}>
-                        <div className={`w-2.5 h-2.5 rounded-full ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]'}`}></div>
-                        <span className="text-white text-xs font-bold tracking-widest">{isRecording ? 'RECORDING' : 'LIVE'}</span>
-                    </div>
+    const copyDeviceId = () => {
+        navigator.clipboard.writeText(deviceId);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
 
-                    <div className="flex items-center gap-2">
-                        <div className={`backdrop-blur-md px-3 py-1.5 rounded-full border flex items-center gap-2 ${connectionStatus === 'connected' ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-300' : 'bg-black/40 border-white/10 text-zinc-400'
+    const handleStopAndExit = () => {
+        stopCamera();
+        navigate(isLoggedIn ? '/dashboard' : '/');
+    };
+
+    return (
+        <div className="h-screen bg-gray-900 relative flex flex-col overflow-hidden">
+            {/* Top Status Bar */}
+            <div className="absolute top-0 left-0 right-0 z-20 safe-top px-6 py-4 bg-gradient-to-b from-black/80 via-black/50 to-transparent pointer-events-none">
+                <div className="flex justify-between items-start">
+                    {/* Left Side - Status */}
+                    <div className="flex flex-col gap-3 pointer-events-auto">
+                        {/* Back Button */}
+                        <button
+                            onClick={() => navigate(isLoggedIn ? '/dashboard' : '/')}
+                            className="flex items-center gap-2 text-white/70 hover:text-white transition-colors text-sm font-medium w-fit"
+                        >
+                            <ArrowLeft size={16} />
+                            Back
+                        </button>
+
+                        {/* Live/Recording Status */}
+                        <div className={`w-fit backdrop-blur-xl px-4 py-2 rounded-full border flex items-center gap-2.5 transition-colors ${isRecording
+                            ? 'bg-red-500/30 border-red-400/50'
+                            : 'bg-white/10 border-white/20'
                             }`}>
-                            <Wifi size={12} />
-                            <span className="text-[10px] font-bold tracking-wider uppercase">{connectionStatus}</span>
+                            <div className={`w-2.5 h-2.5 rounded-full ${isRecording
+                                ? 'bg-red-500 animate-pulse'
+                                : 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]'
+                                }`} />
+                            <span className="text-white text-xs font-bold tracking-widest">
+                                {isRecording ? 'RECORDING' : 'BROADCASTING'}
+                            </span>
                         </div>
-                        {connectionStatus === 'connected' && (
-                            <div className="backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 bg-black/40 text-white flex items-center gap-2">
-                                <Users size={12} />
-                                <span className="text-[10px] font-bold">{viewerCount} Watching</span>
+
+                        {/* Connection Status */}
+                        <div className="flex items-center gap-2">
+                            <div className={`backdrop-blur-xl px-3 py-1.5 rounded-full border flex items-center gap-2 ${connectionStatus === 'connected'
+                                ? 'bg-amber-500/20 border-amber-400/40 text-amber-200'
+                                : 'bg-white/10 border-white/20 text-white/70'
+                                }`}>
+                                <Wifi size={12} />
+                                <span className="text-[10px] font-bold tracking-wider uppercase">{connectionStatus}</span>
+                            </div>
+
+                            {connectionStatus === 'connected' && (
+                                <div className="backdrop-blur-xl px-3 py-1.5 rounded-full border border-white/20 bg-white/10 text-white flex items-center gap-2">
+                                    <Users size={12} />
+                                    <span className="text-[10px] font-bold">{viewerCount} Watching</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Motion Detection Indicator */}
+                        {lastMotionTime && (
+                            <div className="bg-white/10 backdrop-blur-xl px-4 py-2 rounded-full border border-white/20 flex items-center gap-2 animate-fade-in">
+                                <Activity size={12} className="text-amber-400" />
+                                <span className="text-white/80 text-[10px] font-mono tracking-wide">
+                                    Motion {Math.floor((new Date().getTime() - lastMotionTime.getTime()) / 1000)}s ago
+                                </span>
                             </div>
                         )}
                     </div>
 
-                    {lastMotionTime && (
-                        <div className="bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 flex items-center gap-2 animate-fade-in">
-                            <Activity size={12} className="text-indigo-400" />
-                            <span className="text-gray-300 text-[10px] font-mono tracking-wide">
-                                Motion {Math.floor((new Date().getTime() - lastMotionTime.getTime()) / 1000)}s ago
-                            </span>
-                        </div>
-                    )}
-                </div>
-
-                <div className="bg-black/40 backdrop-blur-md px-5 py-3 rounded-2xl border border-white/10 text-right shadow-lg pointer-events-auto cursor-pointer hover:bg-white/10 transition-colors"
-                    onClick={() => navigator.clipboard.writeText(deviceId)}>
-                    <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-1 font-semibold">Device ID</p>
-                    <p className="text-xl font-mono font-bold text-white tracking-widest">{deviceId}</p>
+                    {/* Right Side - Device ID */}
+                    <div
+                        className="bg-white backdrop-blur-xl px-5 py-3 rounded-2xl text-right shadow-xl pointer-events-auto cursor-pointer hover:shadow-2xl transition-all group"
+                        onClick={copyDeviceId}
+                    >
+                        <p className="text-[10px] text-gray-500 uppercase tracking-widest mb-1 font-semibold">Device ID</p>
+                        <p className="text-xl font-mono font-bold tracking-widest flex items-center gap-2" style={{ color: '#b45309' }}>
+                            {deviceId}
+                            {copied ? (
+                                <Check size={16} className="text-green-500" />
+                            ) : (
+                                <Copy size={16} className="text-gray-400 group-hover:text-gray-600 transition-colors" />
+                            )}
+                        </p>
+                        <p className="text-[9px] text-gray-400 mt-1">Tap to copy</p>
+                    </div>
                 </div>
             </div>
 
             {/* Main Video Area */}
-            <div className="flex-1 relative overflow-hidden flex items-center justify-center bg-gray-900">
+            <div className="flex-1 relative overflow-hidden flex items-center justify-center bg-gray-950">
                 <video
                     ref={videoRef}
                     autoPlay
                     playsInline
-                    muted // Muted locally
+                    muted
                     className="w-full h-full object-cover absolute inset-0"
                 />
+
+                {/* Video Disabled Overlay */}
                 {!isVideoEnabled && (
-                    <div className="absolute inset-0 bg-gray-900/90 backdrop-blur-sm flex items-center justify-center flex-col gap-6 animate-fade-in">
+                    <div className="absolute inset-0 bg-gray-900/95 backdrop-blur-sm flex items-center justify-center flex-col gap-6 animate-fade-in">
                         <div className="w-24 h-24 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
                             <VideoOff size={40} className="text-gray-500" />
                         </div>
-                        <p className="text-gray-400 font-medium tracking-wide">Video Transmission Paused</p>
+                        <p className="text-gray-400 font-medium tracking-wide">Video Paused</p>
                     </div>
                 )}
 
-                {/* Grid Overlay */}
-                <div className="absolute inset-0 pointer-events-none opacity-10"
+                {/* Rule of Thirds Grid */}
+                <div
+                    className="absolute inset-0 pointer-events-none opacity-[0.08]"
                     style={{
                         backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.3) 1px, transparent 1px)`,
                         backgroundSize: '33.3% 33.3%'
-                    }}>
-                </div>
+                    }}
+                />
             </div>
 
             {/* Bottom Controls */}
-            <div className="absolute bottom-0 left-0 right-0 z-20 px-6 pb-12 pt-24 bg-gradient-to-t from-black/95 via-black/80 to-transparent">
-                <div className="flex items-center justify-center gap-8 max-w-lg mx-auto">
+            <div className="absolute bottom-0 left-0 right-0 z-20 safe-bottom px-6 pb-8 pt-24 bg-gradient-to-t from-black/90 via-black/70 to-transparent">
+                <div className="flex items-center justify-center gap-6 max-w-lg mx-auto">
+                    {/* Motion Detection */}
                     <button
                         onClick={() => setIsMotionDetectionActive(!isMotionDetectionActive)}
-                        className={`w-14 h-14 rounded-full backdrop-blur-xl border transition-all flex items-center justify-center group ${isMotionDetectionActive
-                            ? 'bg-indigo-600/80 border-indigo-500 text-white shadow-[0_0_20px_rgba(79,70,229,0.4)]'
-                            : 'bg-white/10 border-white/10 text-gray-300 hover:bg-white/20'
+                        className={`w-14 h-14 rounded-full backdrop-blur-xl border transition-all flex items-center justify-center ${isMotionDetectionActive
+                            ? 'text-white shadow-lg'
+                            : 'bg-white/10 border-white/20 text-white/70 hover:bg-white/20'
                             }`}
+                        style={isMotionDetectionActive ? {
+                            background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                            borderColor: 'transparent',
+                            boxShadow: '0 0 20px rgba(251, 191, 36, 0.4)'
+                        } : {}}
                         title="Motion Detection"
                     >
                         <Activity size={24} className={isMotionDetectionActive ? 'animate-pulse' : ''} />
                     </button>
 
+                    {/* Main Controls */}
                     <div className="flex gap-4">
                         <button
                             onClick={toggleVideo}
                             className={`w-16 h-16 rounded-full backdrop-blur-xl border transition-all flex items-center justify-center ${isVideoEnabled
-                                ? 'bg-white/10 border-white/10 text-white hover:bg-white/20'
-                                : 'bg-red-500/20 border-red-500/50 text-red-400'
+                                ? 'bg-white/10 border-white/20 text-white hover:bg-white/20'
+                                : 'bg-red-500/30 border-red-400/50 text-red-400'
                                 }`}
                         >
                             {isVideoEnabled ? <Video size={28} /> : <VideoOff size={28} />}
@@ -309,18 +368,20 @@ export default function CameraPage() {
                         <button
                             onClick={toggleAudio}
                             className={`w-16 h-16 rounded-full backdrop-blur-xl border transition-all flex items-center justify-center ${isAudioEnabled
-                                ? 'bg-white/10 border-white/10 text-white hover:bg-white/20'
-                                : 'bg-red-500/20 border-red-500/50 text-red-400'
+                                ? 'bg-white/10 border-white/20 text-white hover:bg-white/20'
+                                : 'bg-red-500/30 border-red-400/50 text-red-400'
                                 }`}
                         >
                             {isAudioEnabled ? <Mic size={28} /> : <MicOff size={28} />}
                         </button>
                     </div>
 
+                    {/* Stop Button */}
                     <button
-                        className="w-14 h-14 rounded-full bg-red-500/20 backdrop-blur-xl border border-red-500/50 text-red-500 hover:bg-red-500 hover:text-white transition-all flex items-center justify-center shadow-lg hover:shadow-red-500/30"
-                        onClick={stopCamera}
-                        title="Stop Camera"
+                        className="w-14 h-14 rounded-full bg-red-500 backdrop-blur-xl border border-red-400 text-white hover:bg-red-600 transition-all flex items-center justify-center shadow-lg"
+                        style={{ boxShadow: '0 4px 20px rgba(239, 68, 68, 0.4)' }}
+                        onClick={handleStopAndExit}
+                        title="Stop Broadcasting"
                     >
                         <StopCircle size={24} />
                     </button>

@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "livephonecam-5e273"
+  },
+  "targets": {
+    "livephonecam-5e273": {
+      "hosting": {
+        "livephonecam": [
+          "livephonecam-5e273"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

@@ -1,16 +1,47 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>livephonecam</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;700;800&display=swap" rel="stylesheet">
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+  <!-- SEO Meta Tags -->
+  <title>LiveCam - Turn Your Phone Into a Security Camera</title>
+  <meta name="description"
+    content="Simple security at your fingertips. Turn spare phones into powerful security cameras with real-time P2P streaming. Monitor from anywhere, anytime." />
+  <meta name="keywords" content="security camera, phone camera, live streaming, home security, WebRTC, surveillance" />
+
+  <!-- Open Graph / Social Media -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="LiveCam - Home Security Made Simple" />
+  <meta property="og:description"
+    content="Turn your spare phones into powerful security cameras. Real-time P2P streaming with end-to-end encryption." />
+  <meta property="og:site_name" content="LiveCam" />
+
+  <!-- Theme Color for Mobile - Light Theme -->
+  <meta name="theme-color" content="#f59e0b" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet">
+
+  <!-- Prevent Flash of Unstyled Content - Light Theme -->
+  <style>
+    html {
+      background: #fafafa;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
 </html>
