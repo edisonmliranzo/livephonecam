@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
     Camera, Plus, Settings, LogOut, Smartphone, Monitor,
     Play, Trash2, Video, Grid3X3, LayoutGrid, Activity, Shield, Sun, Moon, Cloud, Search,
-    Bell, Home, Users, Info, ChevronRight, MoreHorizontal, History
+    Bell, Home, Users, Info, ChevronRight, MoreHorizontal, History, Wifi
 } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -304,16 +304,41 @@ export default function Dashboard() {
 
             {/* Mobile Bottom Navigation Dock */}
             <div className="nav-dock lg:hidden">
-                <button className="nav-item active"><Home size={20} /></button>
-                <button onClick={() => navigate('/viewer')} className="nav-item"><Monitor size={20} /></button>
+                <button
+                    onClick={() => navigate('/dashboard')}
+                    className="nav-item-circle active"
+                >
+                    <Activity size={20} />
+                    <span className="label">Hub</span>
+                </button>
+                <button
+                    onClick={() => navigate('/viewer')}
+                    className="nav-item-circle"
+                >
+                    <Monitor size={20} />
+                    <span className="label">Watch</span>
+                </button>
                 <button
                     onClick={() => setShowAddModal(true)}
-                    className="w-14 h-14 rounded-full bg-orange-500 -mt-10 border-4 border-white shadow-brand-lg flex items-center justify-center text-white transform active:scale-95 transition-all"
+                    className="nav-item-circle bg-orange-500 border-white text-white shadow-lg active:scale-95"
                 >
                     <Plus size={24} />
+                    <span className="label">Add</span>
                 </button>
-                <button className="nav-item"><History size={20} /></button>
-                <button onClick={() => navigate('/settings')} className="nav-item"><Settings size={20} /></button>
+                <button
+                    onClick={() => navigate('/camera')}
+                    className="nav-item-circle"
+                >
+                    <Wifi size={20} />
+                    <span className="label">Live</span>
+                </button>
+                <button
+                    onClick={() => navigate('/settings')}
+                    className="nav-item-circle"
+                >
+                    <Users size={20} />
+                    <span className="label">Profile</span>
+                </button>
             </div>
 
             {/* Smooth Modal */}
