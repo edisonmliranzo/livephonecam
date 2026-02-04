@@ -3,26 +3,43 @@
 
 <head>
   <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <link rel="icon" type="image/png" href="/icons/icon-192x192.png" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 
   <!-- SEO Meta Tags -->
-  <title>LiveCam - Turn Your Phone Into a Security Camera</title>
+  <title>LivePhoneCam - Turn Your Phone Into a Security Camera</title>
   <meta name="description"
     content="Simple security at your fingertips. Turn spare phones into powerful security cameras with real-time P2P streaming. Monitor from anywhere, anytime." />
   <meta name="keywords" content="security camera, phone camera, live streaming, home security, WebRTC, surveillance" />
 
   <!-- Open Graph / Social Media -->
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="LiveCam - Home Security Made Simple" />
+  <meta property="og:title" content="LivePhoneCam - Home Security Made Simple" />
   <meta property="og:description"
     content="Turn your spare phones into powerful security cameras. Real-time P2P streaming with end-to-end encryption." />
-  <meta property="og:site_name" content="LiveCam" />
+  <meta property="og:site_name" content="LivePhoneCam" />
+  <meta property="og:image" content="/icons/icon-512x512.png" />
 
-  <!-- Theme Color for Mobile - Light Theme -->
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json" />
+
+  <!-- Theme Color for Mobile -->
   <meta name="theme-color" content="#f59e0b" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="LivePhoneCam" />
+  <meta name="mobile-web-app-capable" content="yes" />
+
+  <!-- Apple Touch Icons -->
+  <link rel="apple-touch-icon" href="/icons/icon-152x152.png" />
+  <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png" />
+  <link rel="apple-touch-icon" sizes="167x167" href="/icons/icon-192x192.png" />
+
+  <!-- Microsoft Tile -->
+  <meta name="msapplication-TileImage" content="/icons/icon-144x144.png" />
+  <meta name="msapplication-TileColor" content="#f59e0b" />
 
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -31,7 +48,7 @@
     href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800&display=swap"
     rel="stylesheet">
 
-  <!-- Prevent Flash of Unstyled Content - Light Theme -->
+  <!-- Prevent Flash of Unstyled Content -->
   <style>
     html {
       background: #fafafa;
@@ -42,6 +59,21 @@
 <body>
   <div id="root"></div>
   <script type="module" src="/src/main.tsx"></script>
+
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then((registration) => {
+            console.log('SW registered:', registration.scope);
+          })
+          .catch((error) => {
+            console.log('SW registration failed:', error);
+          });
+      });
+    }
+  </script>
 </body>
 
 </html>
