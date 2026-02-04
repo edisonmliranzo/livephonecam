@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">LivePhoneCam</string>
+    <string name="title_activity_main">LivePhoneCam</string>
+    <string name="package_name">com.livephonecam.app</string>
+    <string name="custom_url_scheme">com.livephonecam.app</string>
+</resources>
