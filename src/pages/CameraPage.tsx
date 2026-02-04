@@ -1,9 +1,10 @@
-import { Mic, MicOff, Video, VideoOff, Activity, StopCircle, Wifi, Users, Copy, Check, ArrowLeft } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, Activity, StopCircle, Wifi, Users, ArrowLeft } from 'lucide-react';
 import { useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db, auth } from '../lib/firebase';
-import { collection, doc, setDoc, onSnapshot, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, setDoc, onSnapshot, addDoc, deleteDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
+import type { User } from 'firebase/auth';
 
 // WebRTC Configuration
 const servers = {
@@ -18,13 +19,13 @@ const servers = {
 export default function CameraPage() {
     const navigate = useNavigate();
     const videoRef = useRef<HTMLVideoElement>(null);
+    const [user, setUser] = useState<User | null>(null);
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [isAudioEnabled, setIsAudioEnabled] = useState(true);
     const [isVideoEnabled, setIsVideoEnabled] = useState(true);
     const [isMotionDetectionActive, setIsMotionDetectionActive] = useState(false);
-    const [deviceId] = useState('CAM-' + Math.floor(1000 + Math.random() * 9000));
-    const [copied, setCopied] = useState(false);
-    const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [deviceId, setDeviceId] = useState('');
+    const [deviceName, setDeviceName] = useState('');
 
     // WebRTC State
     const [pc, setPc] = useState<RTCPeerConnection | null>(null);
@@ -32,30 +33,32 @@ export default function CameraPage() {
     const [viewerCount, setViewerCount] = useState(0);
 
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-    const [recordedChunks, setRecordedChunks] = useState<Blob[]>([]);
     const [isRecording, setIsRecording] = useState(false);
     const [lastMotionTime, setLastMotionTime] = useState<Date | null>(null);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            setIsLoggedIn(!!user);
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+            if (currentUser) {
+                setUser(currentUser);
+                // Generate unique device ID for this broadcast session
+                const newDeviceId = `CAM-${Date.now().toString(36).toUpperCase()}`;
+                setDeviceId(newDeviceId);
+                setDeviceName(`${currentUser.displayName?.split(' ')[0] || 'My'}'s Camera`);
+            } else {
+                navigate('/auth');
+            }
         });
         return () => unsubscribe();
-    }, []);
+    }, [navigate]);
 
     useEffect(() => {
-        if (recordedChunks.length > 0) {
-            console.log(`Saved ${recordedChunks.length} clips internally.`);
+        if (user && deviceId) {
+            startCamera();
         }
-    }, [recordedChunks]);
-
-    useEffect(() => {
-        startCamera();
         return () => {
             stopCamera();
-            cleanupSignal();
         };
-    }, []);
+    }, [user, deviceId]);
 
     // Motion Detection Simulation
     useEffect(() => {
@@ -71,9 +74,12 @@ export default function CameraPage() {
     }, [isMotionDetectionActive, isRecording]);
 
     const cleanupSignal = async () => {
-        if (deviceId) {
+        if (user && deviceId) {
             try {
+                // Delete from global cameras collection
                 await deleteDoc(doc(db, 'cameras', deviceId));
+                // Update user's device status
+                await deleteDoc(doc(db, 'users', user.uid, 'broadcasts', deviceId));
             } catch (e) {
                 console.error("Cleanup error", e);
             }
@@ -92,6 +98,8 @@ export default function CameraPage() {
     };
 
     const startCamera = async () => {
+        if (!user || !deviceId) return;
+
         try {
             const mediaStream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: 'environment' },
@@ -101,7 +109,7 @@ export default function CameraPage() {
             if (videoRef.current) {
                 videoRef.current.srcObject = mediaStream;
             }
-            initializeSignaling(mediaStream);
+            await initializeSignaling(mediaStream);
         } catch (err) {
             console.error("Error accessing camera:", err);
             alert("Could not access camera. Please allow permissions.");
@@ -109,6 +117,8 @@ export default function CameraPage() {
     };
 
     const initializeSignaling = async (mediaStream: MediaStream) => {
+        if (!user) return;
+
         setConnectionStatus('waiting');
         const peerConnection = new RTCPeerConnection(servers);
 
@@ -116,6 +126,7 @@ export default function CameraPage() {
             peerConnection.addTrack(track, mediaStream);
         });
 
+        // Create call document in global cameras collection
         const callDoc = doc(db, 'cameras', deviceId);
         const offerCandidates = collection(callDoc, 'offerCandidates');
         const answerCandidates = collection(callDoc, 'answerCandidates');
@@ -134,7 +145,24 @@ export default function CameraPage() {
             type: offerDescription.type,
         };
 
-        await setDoc(callDoc, { offer, online: true, updatedAt: serverTimestamp() });
+        // Save to global cameras collection with user info
+        await setDoc(callDoc, {
+            offer,
+            online: true,
+            userId: user.uid,
+            userName: user.displayName || 'Unknown',
+            deviceName: deviceName,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+        });
+
+        // Also save to user's broadcasts collection for easy querying
+        await setDoc(doc(db, 'users', user.uid, 'broadcasts', deviceId), {
+            deviceId,
+            deviceName,
+            online: true,
+            createdAt: serverTimestamp()
+        });
 
         onSnapshot(callDoc, (snapshot) => {
             const data = snapshot.data();
@@ -142,7 +170,7 @@ export default function CameraPage() {
                 const answerDescription = new RTCSessionDescription(data.answer);
                 peerConnection.setRemoteDescription(answerDescription);
                 setConnectionStatus('connected');
-                setViewerCount(1);
+                setViewerCount(prev => prev + 1);
             }
         });
 
@@ -158,11 +186,22 @@ export default function CameraPage() {
         peerConnection.onconnectionstatechange = () => {
             if (peerConnection.connectionState === 'disconnected') {
                 setConnectionStatus('waiting');
-                setViewerCount(0);
+                setViewerCount(prev => Math.max(0, prev - 1));
             }
         };
 
+        // Heartbeat to keep broadcast alive
+        const heartbeat = setInterval(async () => {
+            try {
+                await updateDoc(callDoc, { updatedAt: serverTimestamp() });
+            } catch (e) {
+                console.log("Heartbeat stopped");
+            }
+        }, 30000);
+
         setPc(peerConnection);
+
+        return () => clearInterval(heartbeat);
     };
 
     const stopCamera = () => {
@@ -182,7 +221,7 @@ export default function CameraPage() {
                 recorder.ondataavailable = (e) => chunks.push(e.data);
                 recorder.onstop = () => {
                     const blob = new Blob(chunks, { type: 'video/webm' });
-                    setRecordedChunks(prev => [...prev, blob]);
+                    console.log("Recording saved:", blob.size, "bytes");
                 };
                 recorder.start();
                 mediaRecorderRef.current = recorder;
@@ -214,163 +253,291 @@ export default function CameraPage() {
         }
     };
 
-    const copyDeviceId = () => {
-        navigator.clipboard.writeText(deviceId);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
-
     const handleStopAndExit = () => {
         stopCamera();
-        navigate(isLoggedIn ? '/dashboard' : '/');
+        navigate('/dashboard');
     };
 
+    if (!user) {
+        return (
+            <div style={{
+                minHeight: '100vh',
+                background: '#111827',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white'
+            }}>
+                Loading...
+            </div>
+        );
+    }
+
     return (
-        <div className="h-screen bg-gray-900 relative flex flex-col overflow-hidden">
+        <div style={{
+            height: '100vh',
+            background: '#111827',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            position: 'relative'
+        }}>
             {/* Top Status Bar */}
-            <div className="absolute top-0 left-0 right-0 z-20 safe-top px-6 py-4 bg-gradient-to-b from-black/80 via-black/50 to-transparent pointer-events-none">
-                <div className="flex justify-between items-start">
+            <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                zIndex: 20,
+                padding: '24px',
+                background: 'linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, transparent 100%)',
+                pointerEvents: 'none'
+            }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     {/* Left Side - Status */}
-                    <div className="flex flex-col gap-3 pointer-events-auto">
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, pointerEvents: 'auto' }}>
                         {/* Back Button */}
                         <button
-                            onClick={() => navigate(isLoggedIn ? '/dashboard' : '/')}
-                            className="flex items-center gap-2 text-white/70 hover:text-white transition-colors text-sm font-medium w-fit"
+                            onClick={() => navigate('/dashboard')}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                background: 'none',
+                                border: 'none',
+                                color: 'rgba(255,255,255,0.7)',
+                                fontSize: 14,
+                                fontWeight: 500,
+                                cursor: 'pointer'
+                            }}
                         >
                             <ArrowLeft size={16} />
                             Back
                         </button>
 
                         {/* Live/Recording Status */}
-                        <div className={`w-fit backdrop-blur-xl px-4 py-2 rounded-full border flex items-center gap-2.5 transition-colors ${isRecording
-                            ? 'bg-red-500/30 border-red-400/50'
-                            : 'bg-white/10 border-white/20'
-                            }`}>
-                            <div className={`w-2.5 h-2.5 rounded-full ${isRecording
-                                ? 'bg-red-500 animate-pulse'
-                                : 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]'
-                                }`} />
-                            <span className="text-white text-xs font-bold tracking-widest">
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 10,
+                            padding: '8px 16px',
+                            background: isRecording ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.1)',
+                            border: `1px solid ${isRecording ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.2)'}`,
+                            borderRadius: 24
+                        }}>
+                            <div style={{
+                                width: 10,
+                                height: 10,
+                                borderRadius: '50%',
+                                background: isRecording ? '#ef4444' : '#22c55e',
+                                animation: isRecording ? 'pulse 1s infinite' : 'none',
+                                boxShadow: isRecording ? 'none' : '0 0 10px rgba(34,197,94,0.5)'
+                            }} />
+                            <span style={{ color: 'white', fontSize: 12, fontWeight: 700, letterSpacing: 2 }}>
                                 {isRecording ? 'RECORDING' : 'BROADCASTING'}
                             </span>
                         </div>
 
                         {/* Connection Status */}
-                        <div className="flex items-center gap-2">
-                            <div className={`backdrop-blur-xl px-3 py-1.5 rounded-full border flex items-center gap-2 ${connectionStatus === 'connected'
-                                ? 'bg-amber-500/20 border-amber-400/40 text-amber-200'
-                                : 'bg-white/10 border-white/20 text-white/70'
-                                }`}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                padding: '6px 12px',
+                                background: connectionStatus === 'connected' ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.1)',
+                                border: `1px solid ${connectionStatus === 'connected' ? 'rgba(245,158,11,0.4)' : 'rgba(255,255,255,0.2)'}`,
+                                borderRadius: 24,
+                                color: connectionStatus === 'connected' ? '#fcd34d' : 'rgba(255,255,255,0.7)'
+                            }}>
                                 <Wifi size={12} />
-                                <span className="text-[10px] font-bold tracking-wider uppercase">{connectionStatus}</span>
+                                <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' }}>{connectionStatus}</span>
                             </div>
 
-                            {connectionStatus === 'connected' && (
-                                <div className="backdrop-blur-xl px-3 py-1.5 rounded-full border border-white/20 bg-white/10 text-white flex items-center gap-2">
+                            {viewerCount > 0 && (
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                    padding: '6px 12px',
+                                    background: 'rgba(255,255,255,0.1)',
+                                    border: '1px solid rgba(255,255,255,0.2)',
+                                    borderRadius: 24,
+                                    color: 'white'
+                                }}>
                                     <Users size={12} />
-                                    <span className="text-[10px] font-bold">{viewerCount} Watching</span>
+                                    <span style={{ fontSize: 10, fontWeight: 700 }}>{viewerCount} Watching</span>
                                 </div>
                             )}
                         </div>
 
                         {/* Motion Detection Indicator */}
                         {lastMotionTime && (
-                            <div className="bg-white/10 backdrop-blur-xl px-4 py-2 rounded-full border border-white/20 flex items-center gap-2 animate-fade-in">
-                                <Activity size={12} className="text-amber-400" />
-                                <span className="text-white/80 text-[10px] font-mono tracking-wide">
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                padding: '8px 16px',
+                                background: 'rgba(255,255,255,0.1)',
+                                border: '1px solid rgba(255,255,255,0.2)',
+                                borderRadius: 24
+                            }}>
+                                <Activity size={12} style={{ color: '#fbbf24' }} />
+                                <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: 10, fontFamily: 'monospace' }}>
                                     Motion {Math.floor((new Date().getTime() - lastMotionTime.getTime()) / 1000)}s ago
                                 </span>
                             </div>
                         )}
                     </div>
 
-                    {/* Right Side - Device ID */}
-                    <div
-                        className="bg-white backdrop-blur-xl px-5 py-3 rounded-2xl text-right shadow-xl pointer-events-auto cursor-pointer hover:shadow-2xl transition-all group"
-                        onClick={copyDeviceId}
-                    >
-                        <p className="text-[10px] text-gray-500 uppercase tracking-widest mb-1 font-semibold">Device ID</p>
-                        <p className="text-xl font-mono font-bold tracking-widest flex items-center gap-2" style={{ color: '#b45309' }}>
-                            {deviceId}
-                            {copied ? (
-                                <Check size={16} className="text-green-500" />
-                            ) : (
-                                <Copy size={16} className="text-gray-400 group-hover:text-gray-600 transition-colors" />
-                            )}
+                    {/* Right Side - Device Info */}
+                    <div style={{
+                        background: 'white',
+                        padding: '12px 20px',
+                        borderRadius: 16,
+                        textAlign: 'right',
+                        pointerEvents: 'auto'
+                    }}>
+                        <p style={{ fontSize: 10, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 4 }}>
+                            Broadcasting as
                         </p>
-                        <p className="text-[9px] text-gray-400 mt-1">Tap to copy</p>
+                        <p style={{ fontSize: 16, fontWeight: 700, color: '#b45309' }}>
+                            {deviceName}
+                        </p>
+                        <p style={{ fontSize: 10, color: '#9ca3af', fontFamily: 'monospace' }}>
+                            {deviceId}
+                        </p>
                     </div>
                 </div>
             </div>
 
             {/* Main Video Area */}
-            <div className="flex-1 relative overflow-hidden flex items-center justify-center bg-gray-950">
+            <div style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: '#030712',
+                position: 'relative',
+                overflow: 'hidden'
+            }}>
                 <video
                     ref={videoRef}
                     autoPlay
                     playsInline
                     muted
-                    className="w-full h-full object-cover absolute inset-0"
+                    style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        position: 'absolute',
+                        inset: 0
+                    }}
                 />
 
                 {/* Video Disabled Overlay */}
                 {!isVideoEnabled && (
-                    <div className="absolute inset-0 bg-gray-900/95 backdrop-blur-sm flex items-center justify-center flex-col gap-6 animate-fade-in">
-                        <div className="w-24 h-24 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
-                            <VideoOff size={40} className="text-gray-500" />
+                    <div style={{
+                        position: 'absolute',
+                        inset: 0,
+                        background: 'rgba(17,24,39,0.95)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 24
+                    }}>
+                        <div style={{
+                            width: 96,
+                            height: 96,
+                            borderRadius: '50%',
+                            background: 'rgba(255,255,255,0.05)',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}>
+                            <VideoOff size={40} style={{ color: '#6b7280' }} />
                         </div>
-                        <p className="text-gray-400 font-medium tracking-wide">Video Paused</p>
+                        <p style={{ color: '#9ca3af', fontWeight: 500 }}>Video Paused</p>
                     </div>
                 )}
-
-                {/* Rule of Thirds Grid */}
-                <div
-                    className="absolute inset-0 pointer-events-none opacity-[0.08]"
-                    style={{
-                        backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.3) 1px, transparent 1px)`,
-                        backgroundSize: '33.3% 33.3%'
-                    }}
-                />
             </div>
 
             {/* Bottom Controls */}
-            <div className="absolute bottom-0 left-0 right-0 z-20 safe-bottom px-6 pb-8 pt-24 bg-gradient-to-t from-black/90 via-black/70 to-transparent">
-                <div className="flex items-center justify-center gap-6 max-w-lg mx-auto">
+            <div style={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                zIndex: 20,
+                padding: '96px 24px 32px',
+                background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 100%)'
+            }}>
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 24,
+                    maxWidth: 400,
+                    margin: '0 auto'
+                }}>
                     {/* Motion Detection */}
                     <button
                         onClick={() => setIsMotionDetectionActive(!isMotionDetectionActive)}
-                        className={`w-14 h-14 rounded-full backdrop-blur-xl border transition-all flex items-center justify-center ${isMotionDetectionActive
-                            ? 'text-white shadow-lg'
-                            : 'bg-white/10 border-white/20 text-white/70 hover:bg-white/20'
-                            }`}
-                        style={isMotionDetectionActive ? {
-                            background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
-                            borderColor: 'transparent',
-                            boxShadow: '0 0 20px rgba(251, 191, 36, 0.4)'
-                        } : {}}
-                        title="Motion Detection"
+                        style={{
+                            width: 56,
+                            height: 56,
+                            borderRadius: '50%',
+                            background: isMotionDetectionActive
+                                ? 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)'
+                                : 'rgba(255,255,255,0.1)',
+                            border: isMotionDetectionActive ? 'none' : '1px solid rgba(255,255,255,0.2)',
+                            color: isMotionDetectionActive ? 'white' : 'rgba(255,255,255,0.7)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: isMotionDetectionActive ? '0 0 20px rgba(251,191,36,0.4)' : 'none'
+                        }}
                     >
-                        <Activity size={24} className={isMotionDetectionActive ? 'animate-pulse' : ''} />
+                        <Activity size={24} />
                     </button>
 
                     {/* Main Controls */}
-                    <div className="flex gap-4">
+                    <div style={{ display: 'flex', gap: 16 }}>
                         <button
                             onClick={toggleVideo}
-                            className={`w-16 h-16 rounded-full backdrop-blur-xl border transition-all flex items-center justify-center ${isVideoEnabled
-                                ? 'bg-white/10 border-white/20 text-white hover:bg-white/20'
-                                : 'bg-red-500/30 border-red-400/50 text-red-400'
-                                }`}
+                            style={{
+                                width: 64,
+                                height: 64,
+                                borderRadius: '50%',
+                                background: isVideoEnabled ? 'rgba(255,255,255,0.1)' : 'rgba(239,68,68,0.3)',
+                                border: `1px solid ${isVideoEnabled ? 'rgba(255,255,255,0.2)' : 'rgba(239,68,68,0.5)'}`,
+                                color: isVideoEnabled ? 'white' : '#f87171',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}
                         >
                             {isVideoEnabled ? <Video size={28} /> : <VideoOff size={28} />}
                         </button>
 
                         <button
                             onClick={toggleAudio}
-                            className={`w-16 h-16 rounded-full backdrop-blur-xl border transition-all flex items-center justify-center ${isAudioEnabled
-                                ? 'bg-white/10 border-white/20 text-white hover:bg-white/20'
-                                : 'bg-red-500/30 border-red-400/50 text-red-400'
-                                }`}
+                            style={{
+                                width: 64,
+                                height: 64,
+                                borderRadius: '50%',
+                                background: isAudioEnabled ? 'rgba(255,255,255,0.1)' : 'rgba(239,68,68,0.3)',
+                                border: `1px solid ${isAudioEnabled ? 'rgba(255,255,255,0.2)' : 'rgba(239,68,68,0.5)'}`,
+                                color: isAudioEnabled ? 'white' : '#f87171',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}
                         >
                             {isAudioEnabled ? <Mic size={28} /> : <MicOff size={28} />}
                         </button>
@@ -378,10 +545,20 @@ export default function CameraPage() {
 
                     {/* Stop Button */}
                     <button
-                        className="w-14 h-14 rounded-full bg-red-500 backdrop-blur-xl border border-red-400 text-white hover:bg-red-600 transition-all flex items-center justify-center shadow-lg"
-                        style={{ boxShadow: '0 4px 20px rgba(239, 68, 68, 0.4)' }}
                         onClick={handleStopAndExit}
-                        title="Stop Broadcasting"
+                        style={{
+                            width: 56,
+                            height: 56,
+                            borderRadius: '50%',
+                            background: '#ef4444',
+                            border: '1px solid #f87171',
+                            color: 'white',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: '0 4px 20px rgba(239,68,68,0.4)'
+                        }}
                     >
                         <StopCircle size={24} />
                     </button>
