@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    Camera, Video, Wifi, Smartphone, RefreshCw,
-    Volume2, VolumeX, ArrowLeft, WifiOff, Radio
+    Camera, Video, Smartphone, RefreshCw,
+    Volume2, VolumeX, ArrowLeft, Radio
 } from 'lucide-react';
 import { db, auth } from '../lib/firebase';
 import { collection, doc, getDoc, updateDoc, onSnapshot, addDoc, query, where } from 'firebase/firestore';
@@ -162,199 +162,164 @@ export default function ViewerPage() {
     if (!isConnected) {
         return (
             <div style={{
-                minHeight: '100vh',
-                background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 50%, #fcd34d 100%)',
-                padding: 24
+                minHeight: '100dvh',
+                background: '#f3f4f6',
+                padding: '16px 16px 80px 16px' // Added bottom padding for navbar
             }}>
                 <div style={{ maxWidth: 600, margin: '0 auto' }}>
                     {/* Header */}
-                    <div style={{ marginBottom: 32 }}>
-                        <button
-                            onClick={() => navigate('/dashboard')}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 8,
-                                background: 'none',
-                                border: 'none',
-                                color: '#92400e',
-                                fontSize: 14,
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                marginBottom: 24
-                            }}
-                        >
-                            <ArrowLeft size={16} />
-                            Back to Dashboard
-                        </button>
-
-                        <h1 style={{ fontSize: 28, fontWeight: 800, color: '#111827', marginBottom: 8 }}>
+                    <div style={{ marginBottom: 24 }}>
+                        <h1 style={{ fontSize: 24, fontWeight: 800, color: '#111827', marginBottom: 4 }}>
                             Live Cameras
                         </h1>
-                        <p style={{ color: '#6b7280' }}>
-                            Select a camera from your account to start viewing
+                        <p style={{ fontSize: 14, color: '#6b7280' }}>
+                            Select a camera to view
                         </p>
                     </div>
 
                     {/* Camera List */}
-                    <div style={{
-                        background: 'white',
-                        borderRadius: 24,
-                        padding: 24,
-                        boxShadow: '0 20px 60px rgba(0,0,0,0.1)'
-                    }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                         {loadingCameras ? (
                             <div style={{
+                                background: 'white',
+                                borderRadius: 16,
+                                padding: 32,
                                 display: 'flex',
                                 flexDirection: 'column',
                                 alignItems: 'center',
-                                padding: 48,
                                 color: '#6b7280'
                             }}>
-                                <RefreshCw size={32} style={{ animation: 'spin 1s linear infinite' }} />
-                                <p style={{ marginTop: 16 }}>Looking for cameras...</p>
+                                <RefreshCw size={24} style={{ animation: 'spin 1s linear infinite' }} />
+                                <p style={{ marginTop: 12, fontSize: 14 }}>Searching...</p>
                             </div>
                         ) : onlineCameras.length === 0 ? (
                             <div style={{
+                                background: 'white',
+                                borderRadius: 16,
+                                padding: 32,
+                                textAlign: 'center',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 alignItems: 'center',
-                                padding: 48,
-                                textAlign: 'center'
+                                gap: 16
                             }}>
                                 <div style={{
-                                    width: 80,
-                                    height: 80,
+                                    width: 64,
+                                    height: 64,
                                     borderRadius: '50%',
                                     background: '#f3f4f6',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    justifyContent: 'center',
-                                    marginBottom: 16
+                                    justifyContent: 'center'
                                 }}>
-                                    <Camera size={36} style={{ color: '#9ca3af' }} />
+                                    <Camera size={24} style={{ color: '#9ca3af' }} />
                                 </div>
-                                <h3 style={{ fontSize: 18, fontWeight: 700, color: '#111827', marginBottom: 8 }}>
-                                    No cameras online
-                                </h3>
-                                <p style={{ color: '#6b7280', marginBottom: 24 }}>
-                                    Start broadcasting from another device to see it here
-                                </p>
+                                <div>
+                                    <h3 style={{ fontSize: 16, fontWeight: 700, color: '#111827' }}>
+                                        No cameras found
+                                    </h3>
+                                    <p style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>
+                                        Start broadcasting on another device first
+                                    </p>
+                                </div>
                                 <button
                                     onClick={() => navigate('/camera')}
                                     style={{
+                                        width: '100%',
                                         display: 'flex',
                                         alignItems: 'center',
+                                        justifyContent: 'center',
                                         gap: 8,
-                                        padding: '12px 24px',
-                                        background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                                        padding: '12px',
+                                        background: '#111827',
                                         color: 'white',
                                         border: 'none',
                                         borderRadius: 12,
-                                        fontWeight: 700,
+                                        fontWeight: 600,
+                                        fontSize: 14,
                                         cursor: 'pointer'
                                     }}
                                 >
-                                    <Radio size={18} />
-                                    Start Broadcasting
+                                    <Radio size={16} />
+                                    Broadcast Now
                                 </button>
                             </div>
                         ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                <p style={{
-                                    fontSize: 12,
-                                    fontWeight: 700,
-                                    color: '#6b7280',
-                                    textTransform: 'uppercase',
-                                    letterSpacing: 1,
-                                    marginBottom: 8
-                                }}>
-                                    {onlineCameras.length} Camera{onlineCameras.length !== 1 ? 's' : ''} Online
-                                </p>
+                            onlineCameras.map((camera) => (
+                                <button
+                                    key={camera.id}
+                                    onClick={() => handleConnect(camera)}
+                                    disabled={loading}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 12,
+                                        padding: 12,
+                                        background: 'white',
+                                        border: '1px solid #e5e7eb',
+                                        borderRadius: 16,
+                                        cursor: 'pointer',
+                                        textAlign: 'left',
+                                        transition: 'all 0.2s',
+                                        opacity: loading ? 0.7 : 1,
+                                        position: 'relative',
+                                        overflow: 'hidden'
+                                    }}
+                                >
+                                    {/* Thumbnail Placeholder */}
+                                    <div style={{
+                                        width: 80,
+                                        height: 60,
+                                        borderRadius: 8,
+                                        background: '#111827',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        flexShrink: 0
+                                    }}>
+                                        <Video size={20} style={{ color: 'rgba(255,255,255,0.5)' }} />
+                                    </div>
 
-                                {onlineCameras.map((camera) => (
-                                    <button
-                                        key={camera.id}
-                                        onClick={() => handleConnect(camera)}
-                                        disabled={loading}
-                                        style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 16,
-                                            padding: 20,
-                                            background: '#f8fafc',
-                                            border: '2px solid #e5e7eb',
-                                            borderRadius: 16,
-                                            cursor: 'pointer',
-                                            textAlign: 'left',
-                                            transition: 'all 0.2s',
-                                            opacity: loading ? 0.5 : 1
-                                        }}
-                                    >
+                                    {/* Info */}
+                                    <div style={{ flex: 1, minWidth: 0 }}>
                                         <div style={{
-                                            width: 56,
-                                            height: 56,
-                                            borderRadius: 12,
-                                            background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center'
+                                            fontSize: 15,
+                                            fontWeight: 700,
+                                            color: '#111827',
+                                            whiteSpace: 'nowrap',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis'
                                         }}>
-                                            <Video size={24} style={{ color: 'white' }} />
-                                        </div>
-                                        <div style={{ flex: 1 }}>
-                                            <div style={{ fontSize: 16, fontWeight: 700, color: '#111827' }}>
-                                                {camera.deviceName}
-                                            </div>
-                                            <div style={{ fontSize: 12, color: '#6b7280', fontFamily: 'monospace' }}>
-                                                {camera.id}
-                                            </div>
+                                            {camera.deviceName}
                                         </div>
                                         <div style={{
+                                            fontSize: 11,
+                                            color: '#6b7280',
                                             display: 'flex',
                                             alignItems: 'center',
-                                            gap: 8,
-                                            padding: '6px 12px',
-                                            background: '#dcfce7',
-                                            borderRadius: 20,
-                                            color: '#16a34a',
-                                            fontSize: 12,
-                                            fontWeight: 700
+                                            gap: 4
                                         }}>
-                                            <div style={{
-                                                width: 8,
-                                                height: 8,
-                                                borderRadius: '50%',
-                                                background: '#22c55e',
-                                                animation: 'pulse 2s infinite'
-                                            }} />
-                                            LIVE
+                                            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e' }} />
+                                            Online Now
                                         </div>
-                                    </button>
-                                ))}
-                            </div>
+                                    </div>
+
+                                    {/* Arrow */}
+                                    <div style={{
+                                        width: 32,
+                                        height: 32,
+                                        borderRadius: '50%',
+                                        background: '#f3f4f6',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: '#111827'
+                                    }}>
+                                        <Video size={14} />
+                                    </div>
+                                </button>
+                            ))
                         )}
-                    </div>
-
-                    {/* Info Card */}
-                    <div style={{
-                        marginTop: 24,
-                        padding: 20,
-                        background: 'rgba(255,255,255,0.8)',
-                        borderRadius: 16,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 16
-                    }}>
-                        <Smartphone size={24} style={{ color: '#f59e0b' }} />
-                        <div>
-                            <div style={{ fontWeight: 600, color: '#111827', marginBottom: 4 }}>
-                                Multi-device streaming
-                            </div>
-                            <div style={{ fontSize: 14, color: '#6b7280' }}>
-                                Use multiple phones as cameras and view them all from any device
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -364,9 +329,9 @@ export default function ViewerPage() {
     // Live View Screen - Mobile-first fullscreen video
     return (
         <div style={{
-            minHeight: '100vh',
-            height: '100vh',
-            background: '#111827',
+            minHeight: '100dvh', // Use dynamic viewport height
+            height: '100dvh',
+            background: '#000', // True black background
             display: 'flex',
             flexDirection: 'column',
             position: 'relative',
@@ -380,21 +345,24 @@ export default function ViewerPage() {
                 right: 0,
                 zIndex: 20,
                 padding: '16px 16px',
+                paddingTop: 'max(16px, env(safe-area-inset-top))',
                 background: 'linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, transparent 100%)',
                 display: 'flex',
                 justifyContent: 'space-between',
-                alignItems: 'flex-start'
+                alignItems: 'flex-start',
+                pointerEvents: 'none' // Let clicks pass through to video/controls
             }}>
                 {/* Left - Back + Camera Info */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, pointerEvents: 'auto' }}>
                     <button
                         onClick={handleDisconnect}
                         style={{
                             display: 'flex',
                             alignItems: 'center',
                             gap: 6,
-                            background: 'rgba(255,255,255,0.1)',
-                            border: '1px solid rgba(255,255,255,0.2)',
+                            background: 'rgba(0,0,0,0.5)',
+                            backdropFilter: 'blur(8px)',
+                            border: '1px solid rgba(255,255,255,0.1)',
                             padding: '8px 12px',
                             borderRadius: 20,
                             color: 'white',
@@ -406,26 +374,6 @@ export default function ViewerPage() {
                         <ArrowLeft size={16} />
                         Back
                     </button>
-
-                    <div style={{
-                        background: 'rgba(255,255,255,0.95)',
-                        padding: '10px 16px',
-                        borderRadius: 12,
-                        boxShadow: '0 4px 20px rgba(0,0,0,0.3)'
-                    }}>
-                        <p style={{
-                            fontSize: 10,
-                            color: '#6b7280',
-                            textTransform: 'uppercase',
-                            letterSpacing: 1,
-                            marginBottom: 2
-                        }}>
-                            Watching
-                        </p>
-                        <p style={{ fontSize: 16, fontWeight: 700, color: '#111827' }}>
-                            {selectedCamera?.deviceName}
-                        </p>
-                    </div>
                 </div>
 
                 {/* Right - Status */}
@@ -435,41 +383,42 @@ export default function ViewerPage() {
                         display: 'flex',
                         alignItems: 'center',
                         gap: 6,
-                        padding: '6px 12px',
+                        padding: '4px 10px',
                         background: '#ef4444',
-                        borderRadius: 20,
+                        borderRadius: 6,
                         color: 'white',
                         fontSize: 11,
-                        fontWeight: 700
+                        fontWeight: 700,
+                        boxShadow: '0 2px 8px rgba(239,68,68,0.4)'
                     }}>
-                        <div style={{
-                            width: 6,
-                            height: 6,
-                            borderRadius: '50%',
-                            background: 'white',
-                            animation: 'pulse 1s infinite'
-                        }} />
                         LIVE
-                    </div>
-
-                    {/* Connection Status */}
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        padding: '6px 12px',
-                        background: stream ? 'rgba(34,197,94,0.2)' : 'rgba(251,191,36,0.2)',
-                        border: `1px solid ${stream ? 'rgba(34,197,94,0.5)' : 'rgba(251,191,36,0.5)'}`,
-                        borderRadius: 20,
-                        color: stream ? '#86efac' : '#fcd34d',
-                        fontSize: 11,
-                        fontWeight: 600
-                    }}>
-                        {stream ? <Wifi size={12} /> : <RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} />}
-                        {stream ? 'Connected' : 'Connecting...'}
                     </div>
                 </div>
             </div>
+
+            {/* Scale/Video Mode Button */}
+            <button
+                style={{
+                    position: 'absolute',
+                    right: 16,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    zIndex: 20,
+                    width: 44,
+                    height: 44,
+                    borderRadius: '50%',
+                    background: 'rgba(0,0,0,0.3)',
+                    backdropFilter: 'blur(4px)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    cursor: 'pointer'
+                }}
+            >
+                <Smartphone size={20} />
+            </button>
 
             {/* Full Screen Video */}
             <div style={{
@@ -477,7 +426,8 @@ export default function ViewerPage() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                background: '#000'
+                background: '#000',
+                position: 'relative'
             }}>
                 {stream ? (
                     <video
@@ -488,7 +438,7 @@ export default function ViewerPage() {
                         style={{
                             width: '100%',
                             height: '100%',
-                            objectFit: 'contain'
+                            objectFit: 'cover', // Enable immersive full screen
                         }}
                     />
                 ) : (
@@ -500,15 +450,14 @@ export default function ViewerPage() {
                         color: 'white'
                     }}>
                         <div style={{
-                            width: 80,
-                            height: 80,
+                            width: 60,
+                            height: 60,
                             borderRadius: '50%',
                             border: '3px solid rgba(251,191,36,0.3)',
                             borderTopColor: '#fbbf24',
                             animation: 'spin 1s linear infinite'
                         }} />
-                        <p style={{ fontWeight: 600 }}>Connecting to camera...</p>
-                        <p style={{ fontSize: 12, color: '#9ca3af' }}>{selectedCamera?.id}</p>
+                        <p style={{ fontWeight: 600, fontSize: 14 }}>Connecting...</p>
                     </div>
                 )}
             </div>
@@ -522,92 +471,83 @@ export default function ViewerPage() {
                 zIndex: 20,
                 padding: '24px 16px',
                 paddingBottom: 'max(24px, env(safe-area-inset-bottom))',
-                background: 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 100%)'
+                background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 100%)',
+                pointerEvents: 'none'
             }}>
                 <div style={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: 16
+                    gap: 32,
+                    pointerEvents: 'auto'
                 }}>
                     {/* Mute Button */}
                     <button
                         onClick={() => setIsMuted(!isMuted)}
                         style={{
-                            width: 56,
-                            height: 56,
+                            width: 50,
+                            height: 50,
                             borderRadius: '50%',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            background: isMuted ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.15)',
-                            border: `2px solid ${isMuted ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.3)'}`,
+                            background: isMuted ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.1)',
+                            backdropFilter: 'blur(4px)',
+                            border: 'none',
                             color: isMuted ? '#f87171' : 'white',
                             cursor: 'pointer'
                         }}
                     >
-                        {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+                        {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
                     </button>
 
-                    {/* Disconnect Button */}
+                    {/* Disconnect Button (Main) */}
                     <button
                         onClick={handleDisconnect}
                         style={{
-                            width: 72,
-                            height: 72,
+                            width: 64,
+                            height: 64,
                             borderRadius: '50%',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             background: '#ef4444',
-                            border: '2px solid #f87171',
+                            border: '4px solid rgba(239,68,68,0.3)',
                             color: 'white',
                             cursor: 'pointer',
-                            boxShadow: '0 4px 20px rgba(239,68,68,0.5)'
+                            boxShadow: '0 4px 20px rgba(239,68,68,0.4)'
                         }}
                     >
-                        <WifiOff size={28} />
+                        <div style={{ width: 24, height: 24, background: 'white', borderRadius: 4 }} />
                     </button>
 
-                    {/* Screenshot Button */}
-                    <button
-                        style={{
-                            width: 56,
-                            height: 56,
-                            borderRadius: '50%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            background: 'rgba(255,255,255,0.15)',
-                            border: '2px solid rgba(255,255,255,0.3)',
-                            color: 'white',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        <Camera size={24} />
-                    </button>
+                    {/* Placeholder for symmetry */}
+                    <div style={{ width: 50 }} />
                 </div>
 
-                {/* Camera Name */}
-                <p style={{
+                {/* Camera Name Label */}
+                <div style={{
                     textAlign: 'center',
-                    marginTop: 16,
-                    fontSize: 12,
-                    color: 'rgba(255,255,255,0.6)',
-                    fontFamily: 'monospace'
+                    marginTop: 20,
+                    opacity: 0.7
                 }}>
-                    {selectedCamera?.id}
-                </p>
+                    <span style={{
+                        background: 'rgba(0,0,0,0.5)',
+                        padding: '4px 12px',
+                        borderRadius: 12,
+                        fontSize: 12,
+                        color: 'white',
+                        fontWeight: 600
+                    }}>
+                        {selectedCamera?.deviceName}
+                    </span>
+                </div>
             </div>
 
             {/* Keyframes */}
             <style>{`
                 @keyframes spin {
                     to { transform: rotate(360deg); }
-                }
-                @keyframes pulse {
-                    0%, 100% { opacity: 1; }
-                    50% { opacity: 0.5; }
                 }
             `}</style>
         </div>
