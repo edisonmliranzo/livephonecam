@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    Camera, Plus, Settings, Smartphone, Monitor,
+    Camera, Plus, Smartphone, Monitor,
     Play, Trash2, Video, Activity, Shield, Sun, Moon, Cloud,
     Bell, Home, LogOut, Wifi, User as UserIcon
 } from 'lucide-react';
@@ -207,42 +207,6 @@ export default function Dashboard() {
                 </div>
             </header>
 
-            {/* Tab Navigation */}
-            <nav style={{
-                display: 'flex',
-                gap: 8,
-                padding: '16px 24px',
-                background: 'white',
-                borderBottom: '1px solid rgba(0,0,0,0.06)'
-            }}>
-                {[
-                    { id: 'devices', label: 'Devices', icon: <Smartphone size={18} /> },
-                    { id: 'activity', label: 'Activity', icon: <Activity size={18} /> },
-                    { id: 'settings', label: 'Settings', icon: <Settings size={18} /> }
-                ].map(tab => (
-                    <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id as any)}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 8,
-                            padding: '12px 20px',
-                            borderRadius: 12,
-                            border: 'none',
-                            background: activeTab === tab.id ? '#f59e0b' : '#f3f4f6',
-                            color: activeTab === tab.id ? 'white' : '#6b7280',
-                            fontWeight: 700,
-                            fontSize: 14,
-                            cursor: 'pointer',
-                            transition: 'all 0.2s'
-                        }}
-                    >
-                        {tab.icon}
-                        {tab.label}
-                    </button>
-                ))}
-            </nav>
 
             {/* Main Content */}
             <main style={{ maxWidth: 1200, margin: '0 auto', padding: 24 }}>
