@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
     Camera, Plus, Settings, Smartphone, Monitor,
     Play, Trash2, Video, Activity, Shield, Sun, Moon, Cloud,
-    Bell, Home, Eye, LogOut
+    Bell, Home, LogOut, Wifi, User as UserIcon
 } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -571,7 +571,7 @@ export default function Dashboard() {
                 )}
             </main>
 
-            {/* Bottom Navigation */}
+            {/* Beautiful Bottom Navbar */}
             <nav style={{
                 position: 'fixed',
                 bottom: 0,
@@ -580,93 +580,112 @@ export default function Dashboard() {
                 zIndex: 100,
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-around',
-                padding: '12px 16px',
-                paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
-                background: 'white',
-                borderTop: '1px solid rgba(0,0,0,0.06)',
-                boxShadow: '0 -4px 20px rgba(0,0,0,0.06)'
+                justifyContent: 'center',
+                padding: '16px 24px',
+                paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
+                background: 'linear-gradient(to top, rgba(255,255,255,1) 0%, rgba(255,255,255,0.98) 100%)',
+                borderTop: '1px solid rgba(0,0,0,0.08)'
             }}>
-                <button onClick={() => setActiveTab('devices')} style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: 4,
-                    padding: 8,
-                    background: 'none',
-                    border: 'none',
-                    color: activeTab === 'devices' ? '#f59e0b' : '#9ca3af',
-                    fontSize: 10,
-                    fontWeight: 700,
-                    cursor: 'pointer'
-                }}>
-                    <Home size={22} />
-                    <span>Home</span>
-                </button>
-                <button onClick={() => navigate('/viewer')} style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: 4,
-                    padding: 8,
-                    background: 'none',
-                    border: 'none',
-                    color: '#9ca3af',
-                    fontSize: 10,
-                    fontWeight: 700,
-                    cursor: 'pointer'
-                }}>
-                    <Eye size={22} />
-                    <span>Watch</span>
-                </button>
-                <button onClick={() => setShowAddModal(true)} style={{
-                    width: 56,
-                    height: 56,
-                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '50%',
-                    marginTop: -24,
-                    boxShadow: '0 6px 20px rgba(245,158,11,0.4)',
-                    cursor: 'pointer',
+                <div style={{
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center'
+                    gap: 8,
+                    background: '#f8fafc',
+                    padding: 6,
+                    borderRadius: 16,
+                    border: '1px solid rgba(0,0,0,0.08)',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
                 }}>
-                    <Plus size={28} />
-                </button>
-                <button onClick={() => navigate('/camera')} style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: 4,
-                    padding: 8,
-                    background: 'none',
-                    border: 'none',
-                    color: '#9ca3af',
-                    fontSize: 10,
-                    fontWeight: 700,
-                    cursor: 'pointer'
-                }}>
-                    <Camera size={22} />
-                    <span>Stream</span>
-                </button>
-                <button onClick={() => setActiveTab('settings')} style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: 4,
-                    padding: 8,
-                    background: 'none',
-                    border: 'none',
-                    color: activeTab === 'settings' ? '#f59e0b' : '#9ca3af',
-                    fontSize: 10,
-                    fontWeight: 700,
-                    cursor: 'pointer'
-                }}>
-                    <Settings size={22} />
-                    <span>Settings</span>
-                </button>
+                    {/* Home */}
+                    <button
+                        onClick={() => setActiveTab('devices')}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            padding: '12px 20px',
+                            background: activeTab === 'devices' ? 'white' : 'transparent',
+                            border: activeTab === 'devices' ? '2px solid #111827' : '2px solid transparent',
+                            borderRadius: 12,
+                            color: activeTab === 'devices' ? '#111827' : '#6b7280',
+                            fontSize: 13,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            boxShadow: activeTab === 'devices' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none'
+                        }}
+                    >
+                        <Home size={18} />
+                        Home
+                    </button>
+
+                    {/* Broadcast */}
+                    <button
+                        onClick={() => navigate('/camera')}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            padding: '12px 20px',
+                            background: 'transparent',
+                            border: '2px solid transparent',
+                            borderRadius: 12,
+                            color: '#6b7280',
+                            fontSize: 13,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                        }}
+                    >
+                        <Wifi size={18} />
+                        Broadcast
+                    </button>
+
+                    {/* View */}
+                    <button
+                        onClick={() => navigate('/viewer')}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            padding: '12px 20px',
+                            background: 'transparent',
+                            border: '2px solid transparent',
+                            borderRadius: 12,
+                            color: '#6b7280',
+                            fontSize: 13,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                        }}
+                    >
+                        <Monitor size={18} />
+                        View
+                    </button>
+
+                    {/* Account */}
+                    <button
+                        onClick={() => setActiveTab('settings')}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            padding: '12px 20px',
+                            background: activeTab === 'settings' ? 'white' : 'transparent',
+                            border: activeTab === 'settings' ? '2px solid #111827' : '2px solid transparent',
+                            borderRadius: 12,
+                            color: activeTab === 'settings' ? '#111827' : '#6b7280',
+                            fontSize: 13,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            boxShadow: activeTab === 'settings' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none'
+                        }}
+                    >
+                        <UserIcon size={18} />
+                        Account
+                    </button>
+                </div>
             </nav>
 
             {/* Add Device Modal */}
