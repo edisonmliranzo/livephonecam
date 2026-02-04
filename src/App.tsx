@@ -1,5 +1,4 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import Header from './components/Header';
 import Home from './pages/Home';
 import CameraPage from './pages/CameraPage';
 import ViewerPage from './pages/ViewerPage';
@@ -17,7 +16,6 @@ function App() {
           <Route path="/auth" element={<Auth />} />
           <Route path="/dashboard" element={<Dashboard />} />
         </Routes>
-        <Header />
       </div>
     </BrowserRouter>
   );
