@@ -545,42 +545,48 @@ export default function Dashboard() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                padding: '16px 24px',
-                paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
+                padding: '12px 12px',
+                paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
                 background: 'linear-gradient(to top, rgba(255,255,255,1) 0%, rgba(255,255,255,0.98) 100%)',
                 borderTop: '1px solid rgba(0,0,0,0.08)'
             }}>
                 <div style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 8,
+                    gap: 4,
                     background: '#f8fafc',
-                    padding: 6,
+                    padding: 4,
                     borderRadius: 16,
                     border: '1px solid rgba(0,0,0,0.08)',
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                    width: '100%',
+                    maxWidth: 400,
+                    justifyContent: 'space-between'
                 }}>
                     {/* Home */}
                     <button
                         onClick={() => setActiveTab('devices')}
                         style={{
                             display: 'flex',
+                            flexDirection: 'column',
                             alignItems: 'center',
-                            gap: 8,
-                            padding: '12px 20px',
+                            gap: 2,
+                            padding: '10px 16px',
                             background: activeTab === 'devices' ? 'white' : 'transparent',
                             border: activeTab === 'devices' ? '2px solid #111827' : '2px solid transparent',
                             borderRadius: 12,
                             color: activeTab === 'devices' ? '#111827' : '#6b7280',
-                            fontSize: 13,
+                            fontSize: 10,
                             fontWeight: 700,
                             cursor: 'pointer',
                             transition: 'all 0.2s',
-                            boxShadow: activeTab === 'devices' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none'
+                            boxShadow: activeTab === 'devices' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                            flex: 1,
+                            minWidth: 0
                         }}
                     >
-                        <Home size={18} />
-                        Home
+                        <Home size={20} />
+                        <span>Home</span>
                     </button>
 
                     {/* Broadcast */}
@@ -588,21 +594,24 @@ export default function Dashboard() {
                         onClick={() => navigate('/camera')}
                         style={{
                             display: 'flex',
+                            flexDirection: 'column',
                             alignItems: 'center',
-                            gap: 8,
-                            padding: '12px 20px',
+                            gap: 2,
+                            padding: '10px 16px',
                             background: 'transparent',
                             border: '2px solid transparent',
                             borderRadius: 12,
                             color: '#6b7280',
-                            fontSize: 13,
+                            fontSize: 10,
                             fontWeight: 700,
                             cursor: 'pointer',
-                            transition: 'all 0.2s'
+                            transition: 'all 0.2s',
+                            flex: 1,
+                            minWidth: 0
                         }}
                     >
-                        <Wifi size={18} />
-                        Broadcast
+                        <Wifi size={20} />
+                        <span>Broadcast</span>
                     </button>
 
                     {/* View */}
@@ -610,21 +619,24 @@ export default function Dashboard() {
                         onClick={() => navigate('/viewer')}
                         style={{
                             display: 'flex',
+                            flexDirection: 'column',
                             alignItems: 'center',
-                            gap: 8,
-                            padding: '12px 20px',
+                            gap: 2,
+                            padding: '10px 16px',
                             background: 'transparent',
                             border: '2px solid transparent',
                             borderRadius: 12,
                             color: '#6b7280',
-                            fontSize: 13,
+                            fontSize: 10,
                             fontWeight: 700,
                             cursor: 'pointer',
-                            transition: 'all 0.2s'
+                            transition: 'all 0.2s',
+                            flex: 1,
+                            minWidth: 0
                         }}
                     >
-                        <Monitor size={18} />
-                        View
+                        <Monitor size={20} />
+                        <span>View</span>
                     </button>
 
                     {/* Account */}
@@ -632,22 +644,25 @@ export default function Dashboard() {
                         onClick={() => setActiveTab('settings')}
                         style={{
                             display: 'flex',
+                            flexDirection: 'column',
                             alignItems: 'center',
-                            gap: 8,
-                            padding: '12px 20px',
+                            gap: 2,
+                            padding: '10px 16px',
                             background: activeTab === 'settings' ? 'white' : 'transparent',
                             border: activeTab === 'settings' ? '2px solid #111827' : '2px solid transparent',
                             borderRadius: 12,
                             color: activeTab === 'settings' ? '#111827' : '#6b7280',
-                            fontSize: 13,
+                            fontSize: 10,
                             fontWeight: 700,
                             cursor: 'pointer',
                             transition: 'all 0.2s',
-                            boxShadow: activeTab === 'settings' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none'
+                            boxShadow: activeTab === 'settings' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                            flex: 1,
+                            minWidth: 0
                         }}
                     >
-                        <UserIcon size={18} />
-                        Account
+                        <UserIcon size={20} />
+                        <span>Account</span>
                     </button>
                 </div>
             </nav>
