@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    Camera, Video, Wifi, Maximize2, LayoutGrid,
-    Smartphone, RefreshCw,
+    Camera, Video, Wifi, Smartphone, RefreshCw,
     Volume2, VolumeX, ArrowLeft, WifiOff, Radio
 } from 'lucide-react';
 import { db, auth } from '../lib/firebase';
@@ -361,386 +360,256 @@ export default function ViewerPage() {
         );
     }
 
-    // Live View Screen
+    // Live View Screen - Mobile-first fullscreen video
     return (
-        <div style={{ minHeight: '100vh', height: '100vh', display: 'flex', background: '#f3f4f6' }}>
-            {/* Sidebar - Desktop */}
-            <aside style={{
-                width: 280,
-                borderRight: '1px solid #e5e7eb',
+        <div style={{
+            minHeight: '100vh',
+            height: '100vh',
+            background: '#111827',
+            display: 'flex',
+            flexDirection: 'column',
+            position: 'relative',
+            overflow: 'hidden'
+        }}>
+            {/* Top Header Overlay */}
+            <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                zIndex: 20,
+                padding: '16px 16px',
+                background: 'linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, transparent 100%)',
                 display: 'flex',
-                flexDirection: 'column',
-                background: 'white',
-                boxShadow: '2px 0 8px rgba(0,0,0,0.05)'
-            }} className="hidden lg:flex">
-                <div style={{ padding: 24 }}>
-                    <h2 style={{ fontSize: 18, fontWeight: 800, color: '#111827', marginBottom: 4 }}>
-                        LivePhoneCam
-                    </h2>
-                    <p style={{ fontSize: 12, color: '#6b7280' }}>Viewing live feed</p>
-                </div>
-
-                <nav style={{ flex: 1, padding: '0 16px' }}>
-                    <p style={{
-                        padding: '12px 16px',
-                        fontSize: 10,
-                        fontWeight: 700,
-                        color: '#9ca3af',
-                        textTransform: 'uppercase',
-                        letterSpacing: 1
-                    }}>
-                        Active Connection
-                    </p>
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 12,
-                        padding: 16,
-                        background: 'rgba(245,158,11,0.1)',
-                        border: '2px solid #fbbf24',
-                        borderRadius: 12
-                    }}>
-                        <div style={{
-                            width: 10,
-                            height: 10,
-                            borderRadius: '50%',
-                            background: stream ? '#22c55e' : '#fbbf24',
-                            animation: stream ? 'none' : 'pulse 1s infinite'
-                        }} />
-                        <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 700, color: '#92400e' }}>
-                                {selectedCamera?.deviceName}
-                            </div>
-                            <div style={{ fontSize: 11, color: '#b45309', fontFamily: 'monospace' }}>
-                                {selectedCamera?.id}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Other online cameras */}
-                    {onlineCameras.filter(c => c.id !== selectedCamera?.id).length > 0 && (
-                        <>
-                            <p style={{
-                                padding: '24px 16px 12px',
-                                fontSize: 10,
-                                fontWeight: 700,
-                                color: '#9ca3af',
-                                textTransform: 'uppercase',
-                                letterSpacing: 1
-                            }}>
-                                Other Cameras
-                            </p>
-                            {onlineCameras.filter(c => c.id !== selectedCamera?.id).map(camera => (
-                                <button
-                                    key={camera.id}
-                                    onClick={() => {
-                                        handleDisconnect();
-                                        setTimeout(() => handleConnect(camera), 100);
-                                    }}
-                                    style={{
-                                        width: '100%',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: 12,
-                                        padding: 12,
-                                        background: 'none',
-                                        border: '1px solid #e5e7eb',
-                                        borderRadius: 12,
-                                        cursor: 'pointer',
-                                        marginBottom: 8
-                                    }}
-                                >
-                                    <div style={{
-                                        width: 8,
-                                        height: 8,
-                                        borderRadius: '50%',
-                                        background: '#22c55e'
-                                    }} />
-                                    <span style={{ fontSize: 14, color: '#374151' }}>{camera.deviceName}</span>
-                                </button>
-                            ))}
-                        </>
-                    )}
-                </nav>
-
-                <div style={{ padding: 16, borderTop: '1px solid #e5e7eb' }}>
+                justifyContent: 'space-between',
+                alignItems: 'flex-start'
+            }}>
+                {/* Left - Back + Camera Info */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                     <button
                         onClick={handleDisconnect}
                         style={{
-                            width: '100%',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: 8,
-                            padding: 12,
-                            background: '#fef2f2',
-                            border: '1px solid #fecaca',
-                            borderRadius: 12,
-                            color: '#dc2626',
+                            gap: 6,
+                            background: 'rgba(255,255,255,0.1)',
+                            border: '1px solid rgba(255,255,255,0.2)',
+                            padding: '8px 12px',
+                            borderRadius: 20,
+                            color: 'white',
+                            fontSize: 13,
                             fontWeight: 600,
                             cursor: 'pointer'
                         }}
                     >
-                        <WifiOff size={18} />
-                        Disconnect
+                        <ArrowLeft size={16} />
+                        Back
                     </button>
-                </div>
-            </aside>
 
-            {/* Main Content */}
-            <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                {/* Header Bar */}
+                    <div style={{
+                        background: 'rgba(255,255,255,0.95)',
+                        padding: '10px 16px',
+                        borderRadius: 12,
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.3)'
+                    }}>
+                        <p style={{
+                            fontSize: 10,
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: 1,
+                            marginBottom: 2
+                        }}>
+                            Watching
+                        </p>
+                        <p style={{ fontSize: 16, fontWeight: 700, color: '#111827' }}>
+                            {selectedCamera?.deviceName}
+                        </p>
+                    </div>
+                </div>
+
+                {/* Right - Status */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
+                    {/* Live Badge */}
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '6px 12px',
+                        background: '#ef4444',
+                        borderRadius: 20,
+                        color: 'white',
+                        fontSize: 11,
+                        fontWeight: 700
+                    }}>
+                        <div style={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: '50%',
+                            background: 'white',
+                            animation: 'pulse 1s infinite'
+                        }} />
+                        LIVE
+                    </div>
+
+                    {/* Connection Status */}
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '6px 12px',
+                        background: stream ? 'rgba(34,197,94,0.2)' : 'rgba(251,191,36,0.2)',
+                        border: `1px solid ${stream ? 'rgba(34,197,94,0.5)' : 'rgba(251,191,36,0.5)'}`,
+                        borderRadius: 20,
+                        color: stream ? '#86efac' : '#fcd34d',
+                        fontSize: 11,
+                        fontWeight: 600
+                    }}>
+                        {stream ? <Wifi size={12} /> : <RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} />}
+                        {stream ? 'Connected' : 'Connecting...'}
+                    </div>
+                </div>
+            </div>
+
+            {/* Full Screen Video */}
+            <div style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: '#000'
+            }}>
+                {stream ? (
+                    <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        muted={isMuted}
+                        style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'contain'
+                        }}
+                    />
+                ) : (
+                    <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: 24,
+                        color: 'white'
+                    }}>
+                        <div style={{
+                            width: 80,
+                            height: 80,
+                            borderRadius: '50%',
+                            border: '3px solid rgba(251,191,36,0.3)',
+                            borderTopColor: '#fbbf24',
+                            animation: 'spin 1s linear infinite'
+                        }} />
+                        <p style={{ fontWeight: 600 }}>Connecting to camera...</p>
+                        <p style={{ fontSize: 12, color: '#9ca3af' }}>{selectedCamera?.id}</p>
+                    </div>
+                )}
+            </div>
+
+            {/* Bottom Controls */}
+            <div style={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                zIndex: 20,
+                padding: '24px 16px',
+                paddingBottom: 'max(24px, env(safe-area-inset-bottom))',
+                background: 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 100%)'
+            }}>
                 <div style={{
-                    height: 64,
-                    borderBottom: '1px solid #e5e7eb',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '0 24px',
-                    background: 'white'
+                    justifyContent: 'center',
+                    gap: 16
                 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                        <button
-                            onClick={handleDisconnect}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 8,
-                                padding: '8px 12px',
-                                background: 'none',
-                                border: 'none',
-                                color: '#6b7280',
-                                cursor: 'pointer'
-                            }}
-                            className="lg:hidden"
-                        >
-                            <ArrowLeft size={16} />
-                        </button>
-                        <h1 style={{ fontWeight: 800, fontSize: 18, color: '#111827' }}>
-                            {selectedCamera?.deviceName}
-                        </h1>
-                        <span style={{
-                            padding: '4px 12px',
-                            borderRadius: 20,
-                            fontSize: 11,
-                            fontWeight: 700,
-                            textTransform: 'uppercase',
-                            background: stream ? '#dcfce7' : '#fef3c7',
-                            color: stream ? '#16a34a' : '#92400e',
-                            border: `1px solid ${stream ? '#bbf7d0' : '#fde68a'}`
-                        }}>
-                            {stream ? 'Live' : 'Connecting...'}
-                        </span>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 4,
-                            padding: 4,
-                            background: '#f3f4f6',
-                            borderRadius: 12
-                        }}>
-                            <button style={{
-                                padding: 8,
-                                borderRadius: 8,
-                                background: 'white',
-                                border: 'none',
-                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                                cursor: 'pointer'
-                            }}>
-                                <Maximize2 size={16} />
-                            </button>
-                            <button style={{
-                                padding: 8,
-                                borderRadius: 8,
-                                background: 'none',
-                                border: 'none',
-                                color: '#6b7280',
-                                cursor: 'pointer'
-                            }}>
-                                <LayoutGrid size={16} />
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Video Area */}
-                <div style={{ flex: 1, padding: 24, overflow: 'hidden' }}>
-                    <div style={{
-                        width: '100%',
-                        height: '100%',
-                        maxWidth: 1200,
-                        margin: '0 auto',
-                        background: 'white',
-                        borderRadius: 24,
-                        overflow: 'hidden',
-                        boxShadow: '0 20px 60px rgba(0,0,0,0.1)',
-                        display: 'flex',
-                        flexDirection: 'column'
-                    }}>
-                        {/* Video Top Overlay */}
-                        <div style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            padding: 16,
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            zIndex: 10,
-                            pointerEvents: 'none'
-                        }}>
-                            <div style={{
-                                padding: '6px 12px',
-                                background: '#ef4444',
-                                color: 'white',
-                                fontSize: 11,
-                                fontWeight: 700,
-                                borderRadius: 6,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 6
-                            }}>
-                                <div style={{
-                                    width: 6,
-                                    height: 6,
-                                    borderRadius: '50%',
-                                    background: 'white',
-                                    animation: 'pulse 1s infinite'
-                                }} />
-                                LIVE
-                            </div>
-                            <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 8,
-                                padding: '6px 12px',
-                                background: 'white',
-                                borderRadius: 8,
-                                fontSize: 12,
-                                fontWeight: 600,
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                                color: stream ? '#16a34a' : '#f59e0b'
-                            }}>
-                                {stream ? <Wifi size={14} /> : <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} />}
-                                {stream ? 'Connected' : 'Connecting'}
-                            </div>
-                        </div>
-
-                        {/* Video Feed */}
-                        <div style={{
-                            flex: 1,
-                            background: '#111827',
+                    {/* Mute Button */}
+                    <button
+                        onClick={() => setIsMuted(!isMuted)}
+                        style={{
+                            width: 56,
+                            height: 56,
+                            borderRadius: '50%',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            position: 'relative',
-                            overflow: 'hidden'
-                        }}>
-                            {stream ? (
-                                <video
-                                    ref={videoRef}
-                                    autoPlay
-                                    playsInline
-                                    muted={isMuted}
-                                    style={{
-                                        width: '100%',
-                                        height: '100%',
-                                        objectFit: 'cover'
-                                    }}
-                                />
-                            ) : (
-                                <div style={{
-                                    color: '#6b7280',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    gap: 24
-                                }}>
-                                    <div style={{
-                                        width: 96,
-                                        height: 96,
-                                        borderRadius: '50%',
-                                        border: '2px dashed #374151',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center'
-                                    }}>
-                                        <Camera size={40} style={{ opacity: 0.5 }} />
-                                    </div>
-                                    <p style={{ fontSize: 14, fontWeight: 500 }}>Waiting for stream...</p>
-                                </div>
-                            )}
-                        </div>
+                            background: isMuted ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.15)',
+                            border: `2px solid ${isMuted ? 'rgba(239,68,68,0.5)' : 'rgba(255,255,255,0.3)'}`,
+                            color: isMuted ? '#f87171' : 'white',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+                    </button>
 
-                        {/* Controls Footer */}
-                        <div style={{
-                            height: 64,
-                            background: 'white',
-                            borderTop: '1px solid #e5e7eb',
+                    {/* Disconnect Button */}
+                    <button
+                        onClick={handleDisconnect}
+                        style={{
+                            width: 72,
+                            height: 72,
+                            borderRadius: '50%',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '0 24px'
-                        }}>
-                            <div style={{ display: 'flex', gap: 12 }}>
-                                <button
-                                    onClick={() => setIsMuted(!isMuted)}
-                                    style={{
-                                        width: 40,
-                                        height: 40,
-                                        borderRadius: 12,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        border: `1px solid ${isMuted ? '#fecaca' : '#e5e7eb'}`,
-                                        background: isMuted ? '#fef2f2' : '#f3f4f6',
-                                        color: isMuted ? '#dc2626' : '#374151',
-                                        cursor: 'pointer'
-                                    }}
-                                >
-                                    {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-                                </button>
-                                <button style={{
-                                    width: 40,
-                                    height: 40,
-                                    borderRadius: 12,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    border: '1px solid #e5e7eb',
-                                    background: '#f3f4f6',
-                                    color: '#374151',
-                                    cursor: 'pointer'
-                                }}>
-                                    <Camera size={18} />
-                                </button>
-                            </div>
+                            justifyContent: 'center',
+                            background: '#ef4444',
+                            border: '2px solid #f87171',
+                            color: 'white',
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 20px rgba(239,68,68,0.5)'
+                        }}
+                    >
+                        <WifiOff size={28} />
+                    </button>
 
-                            <button
-                                onClick={handleDisconnect}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 8,
-                                    padding: '10px 20px',
-                                    background: '#fef2f2',
-                                    border: '1px solid #fecaca',
-                                    borderRadius: 12,
-                                    color: '#dc2626',
-                                    fontWeight: 600,
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                <WifiOff size={16} />
-                                Disconnect
-                            </button>
-                        </div>
-                    </div>
+                    {/* Screenshot Button */}
+                    <button
+                        style={{
+                            width: 56,
+                            height: 56,
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            background: 'rgba(255,255,255,0.15)',
+                            border: '2px solid rgba(255,255,255,0.3)',
+                            color: 'white',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        <Camera size={24} />
+                    </button>
                 </div>
-            </main>
+
+                {/* Camera Name */}
+                <p style={{
+                    textAlign: 'center',
+                    marginTop: 16,
+                    fontSize: 12,
+                    color: 'rgba(255,255,255,0.6)',
+                    fontFamily: 'monospace'
+                }}>
+                    {selectedCamera?.id}
+                </p>
+            </div>
+
+            {/* Keyframes */}
+            <style>{`
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
+                }
+                @keyframes pulse {
+                    0%, 100% { opacity: 1; }
+                    50% { opacity: 0.5; }
+                }
+            `}</style>
         </div>
     );
 }
+
