@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
     Camera, Plus, Settings, Smartphone, Monitor,
     Play, Trash2, Video, Activity, Shield, Sun, Moon, Cloud,
-    Bell, LogOut
+    Bell, Home, Eye, LogOut
 } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -571,7 +571,103 @@ export default function Dashboard() {
                 )}
             </main>
 
-
+            {/* Bottom Navigation */}
+            <nav style={{
+                position: 'fixed',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                zIndex: 100,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-around',
+                padding: '12px 16px',
+                paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+                background: 'white',
+                borderTop: '1px solid rgba(0,0,0,0.06)',
+                boxShadow: '0 -4px 20px rgba(0,0,0,0.06)'
+            }}>
+                <button onClick={() => setActiveTab('devices')} style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: 8,
+                    background: 'none',
+                    border: 'none',
+                    color: activeTab === 'devices' ? '#f59e0b' : '#9ca3af',
+                    fontSize: 10,
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                }}>
+                    <Home size={22} />
+                    <span>Home</span>
+                </button>
+                <button onClick={() => navigate('/viewer')} style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: 8,
+                    background: 'none',
+                    border: 'none',
+                    color: '#9ca3af',
+                    fontSize: 10,
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                }}>
+                    <Eye size={22} />
+                    <span>Watch</span>
+                </button>
+                <button onClick={() => setShowAddModal(true)} style={{
+                    width: 56,
+                    height: 56,
+                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '50%',
+                    marginTop: -24,
+                    boxShadow: '0 6px 20px rgba(245,158,11,0.4)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                }}>
+                    <Plus size={28} />
+                </button>
+                <button onClick={() => navigate('/camera')} style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: 8,
+                    background: 'none',
+                    border: 'none',
+                    color: '#9ca3af',
+                    fontSize: 10,
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                }}>
+                    <Camera size={22} />
+                    <span>Stream</span>
+                </button>
+                <button onClick={() => setActiveTab('settings')} style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: 8,
+                    background: 'none',
+                    border: 'none',
+                    color: activeTab === 'settings' ? '#f59e0b' : '#9ca3af',
+                    fontSize: 10,
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                }}>
+                    <Settings size={22} />
+                    <span>Settings</span>
+                </button>
+            </nav>
 
             {/* Add Device Modal */}
             {showAddModal && (
