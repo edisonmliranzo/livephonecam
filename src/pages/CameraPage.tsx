@@ -431,9 +431,40 @@ export default function CameraPage() {
                         height: '100%',
                         objectFit: 'cover',
                         position: 'absolute',
-                        inset: 0
+                        inset: 0,
+                        transform: 'scaleX(-1)' // Mirror the front camera for selfie view
                     }}
                 />
+
+                {/* Loading overlay when no stream yet */}
+                {!stream && (
+                    <div style={{
+                        position: 'absolute',
+                        inset: 0,
+                        background: '#111827',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 24,
+                        zIndex: 5
+                    }}>
+                        <div style={{
+                            width: 80,
+                            height: 80,
+                            borderRadius: '50%',
+                            border: '3px solid rgba(245,158,11,0.2)',
+                            borderTopColor: '#f59e0b',
+                            animation: 'spin 1s linear infinite'
+                        }} />
+                        <p style={{ color: 'white', fontWeight: 600 }}>Starting camera...</p>
+                        <style>{`
+                            @keyframes spin {
+                                to { transform: rotate(360deg); }
+                            }
+                        `}</style>
+                    </div>
+                )}
 
                 {/* Video Disabled Overlay */}
                 {!isVideoEnabled && (
