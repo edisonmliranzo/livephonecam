@@ -26,6 +26,7 @@ interface OnlineCamera {
     updatedAt: any;
 }
 
+
 export default function ViewerPage() {
     const navigate = useNavigate();
     const [user, setUser] = useState<User | null>(null);
