@@ -249,7 +249,10 @@ export default function CameraPage() {
             }
         };
 
-        const offerDescription = await peerConnection.createOffer();
+        const offerDescription = await peerConnection.createOffer({
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: true,
+        });
         await peerConnection.setLocalDescription(offerDescription);
 
         const offer = {

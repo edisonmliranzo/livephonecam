@@ -4,11 +4,11 @@ import {
     Camera, Video, Smartphone, RefreshCw,
     Volume2, VolumeX, ArrowLeft, Radio, Maximize,
     Home, Wifi, User as UserIcon, Monitor,
-    Battery, Cloud, PlayCircle
+    Battery, Cloud, PlayCircle, Mic, MicOff, Trash2
 } from 'lucide-react';
 import { orderBy, limit } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
-import { collection, doc, getDoc, updateDoc, onSnapshot, addDoc, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, updateDoc, onSnapshot, addDoc, query, where, deleteDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import type { User } from 'firebase/auth';
 
@@ -56,6 +56,8 @@ export default function ViewerPage() {
     const [isRecording, setIsRecording] = useState(false);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const [pc, setPc] = useState<RTCPeerConnection | null>(null);
+    const [isTalking, setIsTalking] = useState(false);
+    const [localAudioStream, setLocalAudioStream] = useState<MediaStream | null>(null);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -125,7 +127,7 @@ export default function ViewerPage() {
         }
     }, [stream, isConnected]);
 
-    const handleConnect = async (camera: OnlineCamera) => {
+    const handleConnect = async (camera: OnlineCamera, audioStream?: MediaStream) => {
         setLoading(true);
         setSelectedCamera(camera);
         setStream(null);
@@ -142,6 +144,13 @@ export default function ViewerPage() {
             }
 
             const peerConnection = new RTCPeerConnection(servers);
+
+            // Add local audio if available (TalkBack)
+            if (audioStream) {
+                audioStream.getTracks().forEach(track => {
+                    peerConnection.addTrack(track, audioStream);
+                });
+            }
 
             peerConnection.ontrack = (event) => {
                 console.log("Stream received");
@@ -259,6 +268,39 @@ export default function ViewerPage() {
             stopRecording();
         } else {
             startRecording();
+        }
+    };
+
+    const toggleTalkBack = async () => {
+        if (isTalking) {
+            // Stop talking
+            if (localAudioStream) {
+                localAudioStream.getTracks().forEach(t => t.stop());
+            }
+            setLocalAudioStream(null);
+            setIsTalking(false);
+            // Reconnect without audio
+            if (selectedCamera) handleConnect(selectedCamera);
+        } else {
+            // Start talking
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                setLocalAudioStream(stream);
+                setIsTalking(true);
+                // Reconnect WITH audio
+                if (selectedCamera) handleConnect(selectedCamera, stream);
+            } catch (err) {
+                alert("Microphone access denied. Please allow permissions.");
+            }
+        }
+    };
+
+    const handleDeleteEvent = async (eventId: string) => {
+        if (!user || !confirm("Delete this recording?")) return;
+        try {
+            await deleteDoc(doc(db, 'users', user.uid, 'events', eventId));
+        } catch (e) {
+            console.error("Failed to delete event", e);
         }
     };
 
@@ -459,49 +501,77 @@ export default function ViewerPage() {
                                 {events.map(event => (
                                     <div key={event.id} style={{
                                         background: 'white',
-                                        borderRadius: 12,
-                                        padding: 12,
+                                        borderRadius: 16,
+                                        padding: 16,
                                         display: 'flex',
                                         alignItems: 'center',
-                                        gap: 12,
-                                        border: '1px solid #e5e7eb'
+                                        gap: 16,
+                                        border: '1px solid rgba(0,0,0,0.05)',
+                                        boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                                        transition: 'transform 0.2s',
+                                        cursor: 'pointer'
                                     }}>
                                         <div style={{
                                             width: 48,
                                             height: 48,
-                                            borderRadius: 8,
-                                            background: '#f3f4f6',
+                                            borderRadius: 12,
+                                            background: '#fef3c7',
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
-                                            color: '#fbbf24'
+                                            color: '#d97706',
+                                            flexShrink: 0
                                         }}>
                                             <PlayCircle size={24} />
                                         </div>
-                                        <div style={{ flex: 1 }}>
-                                            <div style={{ fontWeight: 600, fontSize: 14 }}>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ fontWeight: 700, fontSize: 15, color: '#111827', marginBottom: 2 }}>
                                                 {event.deviceName}
                                             </div>
-                                            <div style={{ fontSize: 11, color: '#6b7280' }}>
-                                                {event.timestamp?.toDate().toLocaleString()}
+                                            <div style={{ fontSize: 12, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                <span>{event.timestamp?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                <span style={{ width: 3, height: 3, borderRadius: '50%', background: '#d1d5db' }} />
+                                                <span>{event.duration}s</span>
                                             </div>
                                         </div>
-                                        <a
-                                            href={event.videoUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            style={{
-                                                padding: '6px 12px',
-                                                background: '#eff6ff',
-                                                color: '#2563eb',
-                                                borderRadius: 20,
-                                                fontSize: 12,
-                                                fontWeight: 600,
-                                                textDecoration: 'none'
-                                            }}
-                                        >
-                                            Watch
-                                        </a>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <a
+                                                href={event.videoUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                style={{
+                                                    padding: '8px 16px',
+                                                    background: '#ebf5ff',
+                                                    color: '#2563eb',
+                                                    borderRadius: 12,
+                                                    fontSize: 13,
+                                                    fontWeight: 600,
+                                                    textDecoration: 'none',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 4
+                                                }}
+                                            >
+                                                Watch
+                                            </a>
+                                            <button
+                                                onClick={() => handleDeleteEvent(event.id)}
+                                                style={{
+                                                    width: 36,
+                                                    height: 36,
+                                                    borderRadius: 10,
+                                                    background: '#fee2e2',
+                                                    color: '#ef4444',
+                                                    border: 'none',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -713,6 +783,35 @@ export default function ViewerPage() {
                         LIVE
                     </div>
 
+
+                </div>
+
+                {/* Status Overlay */}
+                <div style={{
+                    position: 'absolute',
+                    top: 24,
+                    left: 24,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
+                    pointerEvents: 'none'
+                }}>
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '6px 12px',
+                        background: 'rgba(0,0,0,0.5)',
+                        backdropFilter: 'blur(4px)',
+                        borderRadius: 6,
+                        color: 'white',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        boxShadow: '0 2px 8px rgba(239,68,68,0.4)'
+                    }}>
+                        LIVE
+                    </div>
+
                     {/* Battery Indicator (Live) */}
                     {selectedCamera?.batteryLevel !== undefined && (
                         <div style={{
@@ -885,8 +984,25 @@ export default function ViewerPage() {
                         )}
                     </button>
 
-                    {/* Placeholder for symmetry / Layout Balance */}
-                    <div style={{ width: 50 }} />
+                    {/* TalkBack Button */}
+                    <button
+                        onClick={toggleTalkBack}
+                        style={{
+                            width: 50,
+                            height: 50,
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            background: isTalking ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.1)',
+                            backdropFilter: 'blur(4px)',
+                            border: 'none',
+                            color: isTalking ? '#f87171' : 'white',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        {isTalking ? <Mic size={20} /> : <MicOff size={20} />}
+                    </button>
                 </div>
 
                 {/* Camera Name Label */}
