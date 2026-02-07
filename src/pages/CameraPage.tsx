@@ -1,10 +1,12 @@
 import { Mic, MicOff, Video, VideoOff, Activity, StopCircle, Wifi, Users, ArrowLeft, Camera, RefreshCcw, Zap, ZapOff } from 'lucide-react';
 import { useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { db, auth } from '../lib/firebase';
+import { db, auth, storage } from '../lib/firebase';
 import { collection, doc, setDoc, onSnapshot, addDoc, deleteDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { onAuthStateChanged } from 'firebase/auth';
 import type { User } from 'firebase/auth';
+import { EyeOff } from 'lucide-react';
 
 // WebRTC Configuration
 const servers = {
@@ -19,6 +21,7 @@ const servers = {
 export default function CameraPage() {
     const navigate = useNavigate();
     const videoRef = useRef<HTMLVideoElement>(null);
+    const remoteAudioRef = useRef<HTMLAudioElement>(null);
     const [user, setUser] = useState<User | null>(null);
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [isAudioEnabled, setIsAudioEnabled] = useState(true);
@@ -41,6 +44,17 @@ export default function CameraPage() {
     const [isTorchOn, setIsTorchOn] = useState(false);
     const [hasTorch, setHasTorch] = useState(false);
 
+    // Feature State: Stealth & Battery
+    const [isStealth, setIsStealth] = useState(false);
+    const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
+
+    // Feature State: Real Motion Detection
+    const previousFrameRef = useRef<ImageData | null>(null);
+    const motionCanvasRef = useRef<HTMLCanvasElement | null>(null);
+    const motionThreshold = 30; // Sensitivity (0-255)
+    const motionPixelCountThreshold = 1000; // How many pixels must change
+
+
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
             if (currentUser) {
@@ -56,6 +70,36 @@ export default function CameraPage() {
         return () => unsubscribe();
     }, [navigate]);
 
+    // Battery Monitoring
+    useEffect(() => {
+        const getBattery = async () => {
+            if ('getBattery' in navigator) {
+                const battery: any = await (navigator as any).getBattery();
+                setBatteryLevel(Math.floor(battery.level * 100));
+
+                battery.addEventListener('levelchange', () => {
+                    setBatteryLevel(Math.floor(battery.level * 100));
+                });
+            }
+        };
+        getBattery();
+    }, []);
+
+    // Sync Battery to Firestore
+    useEffect(() => {
+        if (!deviceId || batteryLevel === null) return;
+        const updateBattery = async () => {
+            try {
+                const docRef = doc(db, 'cameras', deviceId);
+                await updateDoc(docRef, { batteryLevel });
+            } catch (e) {
+                // Ignore errors if doc doesn't exist yet
+            }
+        };
+        updateBattery();
+    }, [batteryLevel, deviceId]);
+
+    // Cleanup & Camera Setup
     useEffect(() => {
         if (user && deviceId) {
             startCamera();
@@ -65,18 +109,63 @@ export default function CameraPage() {
         };
     }, [user, deviceId]);
 
-    // Motion Detection Simulation
+    // Real Motion Detection
     useEffect(() => {
         let interval: any;
-        if (isMotionDetectionActive) {
+        if (isMotionDetectionActive && stream && videoRef.current) {
+            // Initialize canvas if needed
+            if (!motionCanvasRef.current) {
+                motionCanvasRef.current = document.createElement('canvas');
+                motionCanvasRef.current.width = 320; // Low res for performance
+                motionCanvasRef.current.height = 240;
+            }
+
             interval = setInterval(() => {
-                if (Math.random() > 0.8 && !isRecording) {
-                    triggerMotionRecording();
-                }
-            }, 2000);
+                detectMotion();
+            }, 500); // Check every 500ms
+        } else {
+            previousFrameRef.current = null; // Reset baseline
         }
         return () => clearInterval(interval);
-    }, [isMotionDetectionActive, isRecording]);
+    }, [isMotionDetectionActive, stream, isRecording]); // Depend on isRecording to stop checks while recording? No, we might want continuous
+
+    const detectMotion = () => {
+        if (!videoRef.current || !motionCanvasRef.current || isRecording) return;
+
+        const video = videoRef.current;
+        const canvas = motionCanvasRef.current;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        // Draw current frame (scaled down)
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const currentFrame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+        if (previousFrameRef.current) {
+            // Compare
+            let diffPixels = 0;
+            const data1 = previousFrameRef.current.data;
+            const data2 = currentFrame.data;
+
+            for (let i = 0; i < data1.length; i += 4) {
+                // Simple average diff of RGB
+                const diff = Math.abs(data1[i] - data2[i]) +
+                    Math.abs(data1[i + 1] - data2[i + 1]) +
+                    Math.abs(data1[i + 2] - data2[i + 2]);
+
+                if (diff > motionThreshold * 3) {
+                    diffPixels++;
+                }
+            }
+
+            if (diffPixels > motionPixelCountThreshold) {
+                console.log("Motion Detected!", diffPixels);
+                triggerMotionRecording();
+            }
+        }
+
+        previousFrameRef.current = currentFrame;
+    };
 
     const cleanupSignal = async () => {
         if (user && deviceId) {
@@ -96,10 +185,11 @@ export default function CameraPage() {
 
     const triggerMotionRecording = () => {
         setLastMotionTime(new Date());
+        // Only record if we haven't recorded recently (debounce)
         startRecording();
         setTimeout(() => {
             stopRecording();
-        }, 5000);
+        }, 8000); // Record for 8 seconds
     };
 
     const startCamera = async () => {
@@ -140,6 +230,13 @@ export default function CameraPage() {
         mediaStream.getTracks().forEach(track => {
             peerConnection.addTrack(track, mediaStream);
         });
+
+        // Handle incoming audio for Intercom
+        peerConnection.ontrack = (event) => {
+            if (remoteAudioRef.current) {
+                remoteAudioRef.current.srcObject = event.streams[0];
+            }
+        };
 
         // Create call document in global cameras collection
         const callDoc = doc(db, 'cameras', deviceId);
@@ -234,9 +331,32 @@ export default function CameraPage() {
                 const recorder = new MediaRecorder(stream);
                 const chunks: Blob[] = [];
                 recorder.ondataavailable = (e) => chunks.push(e.data);
-                recorder.onstop = () => {
+                recorder.onstop = async () => {
                     const blob = new Blob(chunks, { type: 'video/webm' });
                     console.log("Recording saved:", blob.size, "bytes");
+
+                    // Upload to Firebase Storage
+                    if (user && deviceId) {
+                        try {
+                            const filename = `motion_${deviceId}_${Date.now()}.webm`;
+                            const storageRef = ref(storage, `recordings/${user.uid}/${filename}`);
+                            const snapshot = await uploadBytes(storageRef, blob);
+                            const downloadURL = await getDownloadURL(snapshot.ref);
+
+                            // Save event to Firestore
+                            await addDoc(collection(db, 'users', user.uid, 'events'), {
+                                type: 'motion',
+                                deviceId,
+                                deviceName,
+                                timestamp: serverTimestamp(),
+                                videoUrl: downloadURL,
+                                duration: 8
+                            });
+                            console.log("Uploaded to cloud");
+                        } catch (e) {
+                            console.error("Upload failed", e);
+                        }
+                    }
                 };
                 recorder.start();
                 mediaRecorderRef.current = recorder;
@@ -609,6 +729,24 @@ export default function CameraPage() {
                     maxWidth: 400,
                     margin: '0 auto'
                 }}>
+                    {/* Stealth Mode Toggle */}
+                    <button
+                        onClick={() => setIsStealth(true)}
+                        style={{
+                            width: 56,
+                            height: 56,
+                            borderRadius: '50%',
+                            background: 'rgba(255,255,255,0.1)',
+                            border: '1px solid rgba(255,255,255,0.2)',
+                            color: 'white',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}
+                    >
+                        <EyeOff size={24} />
+                    </button>
                     {/* Motion Detection */}
                     <button
                         onClick={() => setIsMotionDetectionActive(!isMotionDetectionActive)}
@@ -753,6 +891,42 @@ export default function CameraPage() {
                     </button>
                 </div>
             </div>
-        </div>
+
+            {/* Remote Audio for Intercom */}
+            <audio ref={remoteAudioRef} autoPlay />
+
+            {/* Stealth Overlay */}
+            {
+                isStealth && (
+                    <div
+                        onClick={() => {
+                            // Double click protection logic or simple click to wake
+                            // For now simple click to wake for usability
+                        }}
+                        onDoubleClick={() => setIsStealth(false)}
+                        style={{
+                            position: 'fixed',
+                            inset: 0,
+                            background: 'black',
+                            zIndex: 9999,
+                            cursor: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}
+                    >
+                        <div style={{
+                            color: '#333',
+                            fontSize: 12,
+                            userSelect: 'none',
+                            textAlign: 'center'
+                        }}>
+                            <p>Stealth Mode Active</p>
+                            <p>Double tap to unlock</p>
+                        </div>
+                    </div>
+                )
+            }
+        </div >
     );
 }

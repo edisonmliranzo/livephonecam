@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import {
     Camera, Video, Smartphone, RefreshCw,
     Volume2, VolumeX, ArrowLeft, Radio, Maximize,
-    Home, Wifi, User as UserIcon, Monitor
+    Home, Wifi, User as UserIcon, Monitor,
+    Battery, Cloud, PlayCircle
 } from 'lucide-react';
+import { orderBy, limit } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { collection, doc, getDoc, updateDoc, onSnapshot, addDoc, query, where } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -25,6 +27,16 @@ interface OnlineCamera {
     userName: string;
     online: boolean;
     updatedAt: any;
+    batteryLevel?: number;
+}
+
+interface CameraEvent {
+    id: string;
+    type: 'motion';
+    videoUrl: string;
+    timestamp: any;
+    deviceName: string;
+    duration: number;
 }
 
 
@@ -36,6 +48,7 @@ export default function ViewerPage() {
     const [selectedCamera, setSelectedCamera] = useState<OnlineCamera | null>(null);
     const [loading, setLoading] = useState(false);
     const [loadingCameras, setLoadingCameras] = useState(true);
+    const [events, setEvents] = useState<CameraEvent[]>([]);
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [isMuted, setIsMuted] = useState(false);
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -76,6 +89,31 @@ export default function ViewerPage() {
             });
             setOnlineCameras(cameras);
             setLoadingCameras(false);
+        });
+
+        return () => unsubscribe();
+    }, [user]);
+
+    // Listen for recent events (Cloud Clips)
+    useEffect(() => {
+        if (!user) return;
+
+        const eventsRef = collection(db, 'users', user.uid, 'events');
+        const q = query(
+            eventsRef,
+            orderBy('timestamp', 'desc'),
+            limit(10)
+        );
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const newEvents: CameraEvent[] = [];
+            snapshot.forEach((doc) => {
+                newEvents.push({
+                    id: doc.id,
+                    ...doc.data()
+                } as CameraEvent);
+            });
+            setEvents(newEvents);
         });
 
         return () => unsubscribe();
@@ -366,9 +404,28 @@ export default function ViewerPage() {
                                             gap: 4
                                         }}>
                                             <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e' }} />
+                                            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e' }} />
                                             Online Now
                                         </div>
                                     </div>
+
+                                    {/* Battery Info */}
+                                    {camera.batteryLevel !== undefined && (
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 4,
+                                            padding: '4px 8px',
+                                            background: '#f3f4f6',
+                                            borderRadius: 8,
+                                            marginRight: 12
+                                        }}>
+                                            <Battery size={14} style={{ color: camera.batteryLevel < 20 ? '#ef4444' : '#111827' }} />
+                                            <span style={{ fontSize: 11, fontWeight: 600, color: '#111827' }}>
+                                                {camera.batteryLevel}%
+                                            </span>
+                                        </div>
+                                    )}
 
                                     {/* Arrow */}
                                     <div style={{
@@ -387,6 +444,72 @@ export default function ViewerPage() {
                             ))
                         )}
                     </div>
+
+                    {/* Recent Events Section */}
+                    {events.length > 0 && (
+                        <div style={{ marginTop: 24 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                                <Cloud size={16} />
+                                <h2 style={{ fontSize: 16, fontWeight: 700, color: '#111827' }}>
+                                    Recent Motion Events
+                                </h2>
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                {events.map(event => (
+                                    <div key={event.id} style={{
+                                        background: 'white',
+                                        borderRadius: 12,
+                                        padding: 12,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 12,
+                                        border: '1px solid #e5e7eb'
+                                    }}>
+                                        <div style={{
+                                            width: 48,
+                                            height: 48,
+                                            borderRadius: 8,
+                                            background: '#f3f4f6',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: '#fbbf24'
+                                        }}>
+                                            <PlayCircle size={24} />
+                                        </div>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ fontWeight: 600, fontSize: 14 }}>
+                                                {event.deviceName}
+                                            </div>
+                                            <div style={{ fontSize: 11, color: '#6b7280' }}>
+                                                {event.timestamp?.toDate().toLocaleString()}
+                                            </div>
+                                        </div>
+                                        <a
+                                            href={event.videoUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            style={{
+                                                padding: '6px 12px',
+                                                background: '#eff6ff',
+                                                color: '#2563eb',
+                                                borderRadius: 20,
+                                                fontSize: 12,
+                                                fontWeight: 600,
+                                                textDecoration: 'none'
+                                            }}
+                                        >
+                                            Watch
+                                        </a>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Padding for navbar */}
+                    <div style={{ height: 80 }} />
                 </div>
 
                 {/* Bottom Navbar */}
@@ -589,6 +712,25 @@ export default function ViewerPage() {
                     }}>
                         LIVE
                     </div>
+
+                    {/* Battery Indicator (Live) */}
+                    {selectedCamera?.batteryLevel !== undefined && (
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            padding: '4px 8px',
+                            background: 'rgba(0,0,0,0.5)',
+                            backdropFilter: 'blur(4px)',
+                            borderRadius: 6,
+                            color: 'white'
+                        }}>
+                            <Battery size={12} style={{ color: selectedCamera.batteryLevel < 20 ? '#ef4444' : 'white' }} />
+                            <span style={{ fontSize: 11, fontWeight: 600 }}>
+                                {selectedCamera.batteryLevel}%
+                            </span>
+                        </div>
+                    )}
                 </div>
             </div>
 
