@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Camera, Video, Smartphone, RefreshCw,
-    Volume2, VolumeX, ArrowLeft, Radio, Maximize
+    Volume2, VolumeX, ArrowLeft, Radio, Maximize,
+    Home, Wifi, User as UserIcon, Monitor
 } from 'lucide-react';
 import { db, auth } from '../lib/firebase';
 import { collection, doc, getDoc, updateDoc, onSnapshot, addDoc, query, where } from 'firebase/firestore';
@@ -387,6 +388,136 @@ export default function ViewerPage() {
                         )}
                     </div>
                 </div>
+
+                {/* Bottom Navbar */}
+                <nav style={{
+                    position: 'fixed',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    zIndex: 100,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '12px 12px',
+                    paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+                    background: 'linear-gradient(to top, rgba(255,255,255,1) 0%, rgba(255,255,255,0.98) 100%)',
+                    borderTop: '1px solid rgba(0,0,0,0.08)'
+                }}>
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        background: '#f8fafc',
+                        padding: 4,
+                        borderRadius: 16,
+                        border: '1px solid rgba(0,0,0,0.08)',
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                        width: '100%',
+                        maxWidth: 400,
+                        justifyContent: 'space-between'
+                    }}>
+                        {/* Home */}
+                        <button
+                            onClick={() => navigate('/dashboard')}
+                            style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: 2,
+                                padding: '10px 16px',
+                                background: 'transparent',
+                                border: '2px solid transparent',
+                                borderRadius: 12,
+                                color: '#6b7280',
+                                fontSize: 10,
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                flex: 1,
+                                minWidth: 0
+                            }}
+                        >
+                            <Home size={20} />
+                            <span>Home</span>
+                        </button>
+
+                        {/* Broadcast */}
+                        <button
+                            onClick={() => navigate('/camera')}
+                            style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: 2,
+                                padding: '10px 16px',
+                                background: 'transparent',
+                                border: '2px solid transparent',
+                                borderRadius: 12,
+                                color: '#6b7280',
+                                fontSize: 10,
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                flex: 1,
+                                minWidth: 0
+                            }}
+                        >
+                            <Wifi size={20} />
+                            <span>Broadcast</span>
+                        </button>
+
+                        {/* View */}
+                        <button
+                            style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: 2,
+                                padding: '10px 16px',
+                                background: 'white',
+                                border: '2px solid #111827',
+                                borderRadius: 12,
+                                color: '#111827',
+                                fontSize: 10,
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                                flex: 1,
+                                minWidth: 0
+                            }}
+                        >
+                            <Monitor size={20} />
+                            <span>View</span>
+                        </button>
+
+                        {/* Account */}
+                        <button
+                            onClick={() => navigate('/dashboard')}
+                            style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: 2,
+                                padding: '10px 16px',
+                                background: 'transparent',
+                                border: '2px solid transparent',
+                                borderRadius: 12,
+                                color: '#6b7280',
+                                fontSize: 10,
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                flex: 1,
+                                minWidth: 0
+                            }}
+                        >
+                            <UserIcon size={20} />
+                            <span>Account</span>
+                        </button>
+                    </div>
+                </nav>
             </div>
         );
     }
