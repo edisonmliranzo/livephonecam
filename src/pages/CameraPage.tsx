@@ -1,4 +1,4 @@
-import { Mic, MicOff, Video, VideoOff, Activity, StopCircle, Wifi, Users, ArrowLeft } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, Activity, StopCircle, Wifi, Users, ArrowLeft, Camera, RefreshCcw, Zap, ZapOff } from 'lucide-react';
 import { useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db, auth } from '../lib/firebase';
@@ -35,6 +35,11 @@ export default function CameraPage() {
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const [isRecording, setIsRecording] = useState(false);
     const [lastMotionTime, setLastMotionTime] = useState<Date | null>(null);
+
+    // New Camera Features State
+    const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
+    const [isTorchOn, setIsTorchOn] = useState(false);
+    const [hasTorch, setHasTorch] = useState(false);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -102,10 +107,20 @@ export default function CameraPage() {
 
         try {
             const mediaStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'environment' },
+                video: { facingMode: facingMode }, // Use state
                 audio: true
             });
             setStream(mediaStream);
+
+            // Check for torch support
+            const videoTrack = mediaStream.getVideoTracks()[0];
+            const capabilities = videoTrack.getCapabilities?.(); // Optional chaining in case not supported
+            if (capabilities && (capabilities as any).torch) {
+                setHasTorch(true);
+            } else {
+                setHasTorch(false);
+            }
+
             if (videoRef.current) {
                 videoRef.current.srcObject = mediaStream;
             }
@@ -251,6 +266,87 @@ export default function CameraPage() {
             stream.getVideoTracks().forEach(track => track.enabled = !isVideoEnabled);
             setIsVideoEnabled(!isVideoEnabled);
         }
+    };
+
+    const toggleCamera = async () => {
+        const newMode = facingMode === 'user' ? 'environment' : 'user';
+
+        try {
+            if (stream) {
+                stream.getTracks().forEach(t => t.stop());
+            }
+
+            const newStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: newMode },
+                audio: true
+            });
+
+            // Update local video
+            if (videoRef.current) {
+                videoRef.current.srcObject = newStream;
+            }
+            setStream(newStream);
+            setFacingMode(newMode);
+
+            // Update WebRTC connection if exists
+            if (pc) {
+                const videoTrack = newStream.getVideoTracks()[0];
+                const audioTrack = newStream.getAudioTracks()[0];
+
+                const senders = pc.getSenders();
+                const videoSender = senders.find(s => s.track?.kind === 'video');
+                const audioSender = senders.find(s => s.track?.kind === 'audio');
+
+                if (videoSender) videoSender.replaceTrack(videoTrack);
+                if (audioSender) audioSender.replaceTrack(audioTrack);
+            }
+
+            // Check torch for new camera
+            const videoTrack = newStream.getVideoTracks()[0];
+            const capabilities = videoTrack.getCapabilities?.();
+            setHasTorch(!!(capabilities as any)?.torch);
+            setIsTorchOn(false); // Reset torch state
+
+        } catch (err) {
+            console.error("Failed to switch camera:", err);
+        }
+    };
+
+    const toggleTorch = async () => {
+        if (!stream) return;
+        const track = stream.getVideoTracks()[0];
+        try {
+            await track.applyConstraints({
+                advanced: [{ torch: !isTorchOn } as any]
+            });
+            setIsTorchOn(!isTorchOn);
+        } catch (err) {
+            console.error("Torch toggle failed", err);
+        }
+    };
+
+    const takeSnapshot = () => {
+        if (!videoRef.current) return;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = videoRef.current.videoWidth;
+        canvas.height = videoRef.current.videoHeight;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        // Handle mirroring for snapshot if needed
+        if (facingMode === 'user') {
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+        }
+
+        ctx.drawImage(videoRef.current, 0, 0);
+
+        const link = document.createElement('a');
+        link.download = `snapshot-${Date.now()}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
     };
 
     const handleStopAndExit = () => {
@@ -432,7 +528,7 @@ export default function CameraPage() {
                         objectFit: 'cover',
                         position: 'absolute',
                         inset: 0,
-                        transform: 'scaleX(-1)' // Mirror the front camera for selfie view
+                        transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' // Only mirror front camera
                     }}
                 />
 
@@ -534,6 +630,68 @@ export default function CameraPage() {
                     >
                         <Activity size={24} />
                     </button>
+
+                    {/* Extra Tools (Snapshot, Flash, Flip) */}
+                    <div style={{ display: 'flex', gap: 12, flexDirection: 'column' }}>
+                        {/* Camera Flip */}
+                        <button
+                            onClick={toggleCamera}
+                            style={{
+                                width: 48,
+                                height: 48,
+                                borderRadius: '50%',
+                                background: 'rgba(255,255,255,0.1)',
+                                border: '1px solid rgba(255,255,255,0.2)',
+                                color: 'white',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}
+                        >
+                            <RefreshCcw size={20} />
+                        </button>
+
+                        {/* Flashlight - Only show if available */}
+                        {hasTorch && (
+                            <button
+                                onClick={toggleTorch}
+                                style={{
+                                    width: 48,
+                                    height: 48,
+                                    borderRadius: '50%',
+                                    background: isTorchOn ? 'rgba(251, 191, 36, 0.2)' : 'rgba(255,255,255,0.1)',
+                                    border: isTorchOn ? '1px solid #fbbf24' : '1px solid rgba(255,255,255,0.2)',
+                                    color: isTorchOn ? '#fbbf24' : 'white',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}
+                            >
+                                {isTorchOn ? <Zap size={20} fill="currentColor" /> : <ZapOff size={20} />}
+                            </button>
+                        )}
+
+                        {/* Snapshot */}
+                        <button
+                            onClick={takeSnapshot}
+                            style={{
+                                width: 48,
+                                height: 48,
+                                borderRadius: '50%',
+                                background: 'rgba(255,255,255,0.1)',
+                                border: '1px solid rgba(255,255,255,0.2)',
+                                color: 'white',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}
+                        >
+                            <Camera size={20} />
+                        </button>
+                    </div>
 
                     {/* Main Controls */}
                     <div style={{ display: 'flex', gap: 16 }}>

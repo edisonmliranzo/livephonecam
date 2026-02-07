@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Camera, Video, Smartphone, RefreshCw,
-    Volume2, VolumeX, ArrowLeft, Radio
+    Volume2, VolumeX, ArrowLeft, Radio, Maximize
 } from 'lucide-react';
 import { db, auth } from '../lib/firebase';
 import { collection, doc, getDoc, updateDoc, onSnapshot, addDoc, query, where } from 'firebase/firestore';
@@ -38,6 +38,9 @@ export default function ViewerPage() {
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [isMuted, setIsMuted] = useState(false);
     const videoRef = useRef<HTMLVideoElement>(null);
+    const [videoFit, setVideoFit] = useState<'cover' | 'contain'>('cover');
+    const [isRecording, setIsRecording] = useState(false);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const [pc, setPc] = useState<RTCPeerConnection | null>(null);
 
     useEffect(() => {
@@ -156,6 +159,68 @@ export default function ViewerPage() {
         setStream(null);
         setIsConnected(false);
         setSelectedCamera(null);
+        setIsRecording(false);
+    };
+
+    const toggleVideoFit = () => {
+        setVideoFit(prev => prev === 'cover' ? 'contain' : 'cover');
+    };
+
+    const takeSnapshot = () => {
+        if (!videoRef.current) return;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = videoRef.current.videoWidth;
+        canvas.height = videoRef.current.videoHeight;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        ctx.drawImage(videoRef.current, 0, 0);
+
+        const link = document.createElement('a');
+        link.download = `viewer-snapshot-${Date.now()}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    };
+
+    const startRecording = () => {
+        if (stream && !isRecording) {
+            try {
+                const recorder = new MediaRecorder(stream);
+                const chunks: Blob[] = [];
+                recorder.ondataavailable = (e) => chunks.push(e.data);
+                recorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: 'video/webm' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `recording-${Date.now()}.webm`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                };
+                recorder.start();
+                mediaRecorderRef.current = recorder;
+                setIsRecording(true);
+            } catch (e) {
+                console.error("Failed to start recorder", e);
+            }
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+        }
+    };
+
+    const toggleRecording = () => {
+        if (isRecording) {
+            stopRecording();
+        } else {
+            startRecording();
+        }
     };
 
     // Camera Selection Screen
@@ -398,6 +463,7 @@ export default function ViewerPage() {
 
             {/* Scale/Video Mode Button */}
             <button
+                onClick={toggleVideoFit}
                 style={{
                     position: 'absolute',
                     right: 16,
@@ -417,7 +483,7 @@ export default function ViewerPage() {
                     cursor: 'pointer'
                 }}
             >
-                <Smartphone size={20} />
+                {videoFit === 'cover' ? <Maximize size={20} /> : <Smartphone size={20} />}
             </button>
 
             {/* Full Screen Video */}
@@ -438,7 +504,7 @@ export default function ViewerPage() {
                         style={{
                             width: '100%',
                             height: '100%',
-                            objectFit: 'cover', // Enable immersive full screen
+                            objectFit: videoFit, // Dynamic object fit
                         }}
                     />
                 ) : (
@@ -501,9 +567,29 @@ export default function ViewerPage() {
                         {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
                     </button>
 
-                    {/* Disconnect Button (Main) */}
+                    {/* Snapshot Button */}
                     <button
-                        onClick={handleDisconnect}
+                        onClick={takeSnapshot}
+                        style={{
+                            width: 50,
+                            height: 50,
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            background: 'rgba(255,255,255,0.1)',
+                            backdropFilter: 'blur(4px)',
+                            border: 'none',
+                            color: 'white',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        <Camera size={20} />
+                    </button>
+
+                    {/* Recording Button */}
+                    <button
+                        onClick={toggleRecording}
                         style={{
                             width: 64,
                             height: 64,
@@ -511,17 +597,22 @@ export default function ViewerPage() {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            background: '#ef4444',
-                            border: '4px solid rgba(239,68,68,0.3)',
-                            color: 'white',
+                            background: isRecording ? 'white' : '#ef4444',
+                            border: isRecording ? '4px solid #ef4444' : '4px solid rgba(239,68,68,0.3)',
+                            color: isRecording ? '#ef4444' : 'white',
                             cursor: 'pointer',
-                            boxShadow: '0 4px 20px rgba(239,68,68,0.4)'
+                            boxShadow: '0 4px 20px rgba(239,68,68,0.4)',
+                            transition: 'all 0.3s'
                         }}
                     >
-                        <div style={{ width: 24, height: 24, background: 'white', borderRadius: 4 }} />
+                        {isRecording ? (
+                            <div style={{ width: 24, height: 24, background: '#ef4444', borderRadius: 4 }} />
+                        ) : (
+                            <div style={{ width: 24, height: 24, background: 'white', borderRadius: '50%' }} />
+                        )}
                     </button>
 
-                    {/* Placeholder for symmetry */}
+                    {/* Placeholder for symmetry / Layout Balance */}
                     <div style={{ width: 50 }} />
                 </div>
 
@@ -550,7 +641,7 @@ export default function ViewerPage() {
                     to { transform: rotate(360deg); }
                 }
             `}</style>
-        </div>
+        </div >
     );
 }
 

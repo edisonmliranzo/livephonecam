@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import {
     Camera, Plus, Smartphone, Monitor,
     Play, Trash2, Video, Activity, Shield, Sun, Moon, Cloud,
-    Bell, Home, LogOut, Wifi, User as UserIcon
+    Bell, Home, LogOut, Wifi, User as UserIcon, Edit2, Check, X
 } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signOut, updateProfile } from 'firebase/auth';
 import type { User } from 'firebase/auth';
 import { collection, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 
@@ -28,6 +28,8 @@ export default function Dashboard() {
     const [newDeviceName, setNewDeviceName] = useState('');
     const [newDeviceType, setNewDeviceType] = useState<'camera' | 'viewer'>('camera');
     const [currentTime, setCurrentTime] = useState(new Date());
+    const [isEditingName, setIsEditingName] = useState(false);
+    const [editNameValue, setEditNameValue] = useState('');
 
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -85,6 +87,25 @@ export default function Dashboard() {
     const handleSignOut = async () => {
         await signOut(auth);
         navigate('/');
+    };
+
+    const handleUpdateName = async () => {
+        if (!user || !editNameValue.trim()) return;
+        try {
+            await updateProfile(user, {
+                displayName: editNameValue.trim()
+            });
+            setUser({ ...user, displayName: editNameValue.trim() });
+            setIsEditingName(false);
+        } catch (error) {
+            console.error("Error updating profile:", error);
+            alert("Failed to update profile name.");
+        }
+    };
+
+    const startEditingName = () => {
+        setEditNameValue(user?.displayName || '');
+        setIsEditingName(true);
     };
 
     const getGreeting = () => {
@@ -504,10 +525,57 @@ export default function Dashboard() {
                                 background: '#f8fafc',
                                 borderRadius: 16
                             }}>
-                                <div>
+                                <div style={{ flex: 1 }}>
                                     <div style={{ fontWeight: 700, color: '#111827', marginBottom: 4 }}>Display Name</div>
-                                    <div style={{ color: '#6b7280', fontSize: 14 }}>{user?.displayName || 'Not set'}</div>
+                                    {isEditingName ? (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <input
+                                                autoFocus
+                                                value={editNameValue}
+                                                onChange={(e) => setEditNameValue(e.target.value)}
+                                                style={{
+                                                    fontSize: 14,
+                                                    padding: '4px 8px',
+                                                    borderRadius: 6,
+                                                    border: '1px solid #d1d5db',
+                                                    outline: 'none',
+                                                    width: '100%',
+                                                    maxWidth: 200
+                                                }}
+                                            />
+                                            <button
+                                                onClick={handleUpdateName}
+                                                style={{ border: 'none', background: '#dcfce7', color: '#16a34a', borderRadius: 4, padding: 4, cursor: 'pointer' }}
+                                            >
+                                                <Check size={16} />
+                                            </button>
+                                            <button
+                                                onClick={() => setIsEditingName(false)}
+                                                style={{ border: 'none', background: '#fee2e2', color: '#dc2626', borderRadius: 4, padding: 4, cursor: 'pointer' }}
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div style={{ color: '#6b7280', fontSize: 14 }}>{user?.displayName || 'Not set'}</div>
+                                    )}
                                 </div>
+                                {!isEditingName && (
+                                    <button
+                                        onClick={startEditingName}
+                                        style={{
+                                            border: 'none',
+                                            background: 'white',
+                                            padding: 8,
+                                            borderRadius: '50%',
+                                            cursor: 'pointer',
+                                            color: '#6b7280',
+                                            boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                                        }}
+                                    >
+                                        <Edit2 size={16} />
+                                    </button>
+                                )}
                             </div>
                             <button
                                 onClick={handleSignOut}
